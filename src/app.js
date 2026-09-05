@@ -39,9 +39,19 @@
     return E.NOMES_DIA_SEMANA[E.diaDaSemana(dia)];
   }
 
+  /**
+   * "05/09 (sab)" - com o ano junto quando ele nao e' o da data de referencia.
+   * Com horizonte de 12 meses, "05/09" sozinho e' ambiguo: parece hoje.
+   */
+  function comAno(dia) {
+    var ano = E.anoDe(dia);
+    var anoBase = E.anoDe(E.isoParaDia(estado.dataReferencia || hojeISO()));
+    return E.rotuloCurto(dia) + (ano === anoBase ? '' : '/' + String(ano).slice(2));
+  }
+
   function dataLonga(iso) {
     var d = E.isoParaDia(iso);
-    return E.rotuloCurto(d) + ' (' + textoDiaSemana(d) + ')';
+    return comAno(d) + ' (' + textoDiaSemana(d) + ')';
   }
 
   function criar(tag, atributos, filhos) {
@@ -64,6 +74,7 @@
       exemplo: true,
       saldoInicial: 4200,
       dataReferencia: hojeISO(),
+      saldoInformadoEm: hojeISO(),
       limiteNegativo: 2000,
       maxDiasNegativos: 10,
       modoFranquia: 'mensal',
@@ -102,6 +113,22 @@
   }
 
   var estado = carregar();
+  var dataFoiAvancada = adiantarParaHoje();
+
+  /**
+   * Um app que responde "quanto posso tirar HOJE" nao pode abrir na data de
+   * ontem. Avanca sozinho, mas nunca recua: se o usuario apontou para uma data
+   * futura de proposito, essa escolha e' dele.
+   */
+  function adiantarParaHoje() {
+    var hoje = hojeISO();
+    if (!estado.dataReferencia || estado.dataReferencia < hoje) {
+      var mudou = !!estado.dataReferencia && estado.dataReferencia !== hoje;
+      estado.dataReferencia = hoje;
+      return mudou;
+    }
+    return false;
+  }
 
   function carregar() {
     try {
@@ -190,6 +217,21 @@
 
     var hoje = E.maximoRetiravel(ctx, diaInicio, []);
 
+    // Entra menos do que sai? Entao a "sobra" de hoje e' so' o caixa acabando
+    // devagar, e o numero depende do horizonte escolhido. Isso precisa ser dito.
+    //
+    // Somar os lancamentos da janela daria um numero torto: os meses das bordas
+    // entram pela metade, entao uma regra cai 6 vezes e outra 5. O resultado
+    // mensal sai das REGRAS recorrentes, que e' o numero que ele reconhece.
+    // Lancamento avulso fica de fora - ele nao se repete.
+    var liquidoMensal = (estado.regras || []).reduce(function (soma, regra) {
+      if (regra.ativo === false) return soma;
+      if ((regra.agenda || {}).tipo === 'unica') return soma;
+      var v = Math.abs(E.paraCentavos(regra.valor));
+      return soma + (regra.tipo === 'saida' ? -v : v);
+    }, 0);
+    var deficitMensal = liquidoMensal < 0 ? -liquidoMensal : 0;
+
     return {
       calendario: calendario, ctx: ctx, restricoes: restricoes,
       diaInicio: diaInicio, diaFimExibicao: diaFimExibicao,
@@ -197,6 +239,7 @@
       semAportes: semAportes, comPlano: comPlano,
       avaliacaoBase: avaliacaoBase, avaliacaoPlano: avaliacaoPlano,
       sugeridoHoje: hoje.centavos, colchao: colchao, pisoBruto: pisoBruto,
+      deficitMensal: deficitMensal,
       trava: hoje, viavel: hoje.viavelSemRetirada
     };
   }
@@ -234,6 +277,19 @@
       }
     }
 
+    if (r.viavel && estado.saldoInformadoEm && estado.saldoInformadoEm !== estado.dataReferencia) {
+      avisos.appendChild(montarAviso('atencao', '&#9679;',
+        '<b>Confira o saldo antes de transferir.</b> O valor em conta foi informado em ' +
+        dataLonga(estado.saldoInformadoEm) + ' e a projeção já está rodando a partir de ' +
+        dataLonga(estado.dataReferencia) + '.'));
+    }
+    if (r.deficitMensal > 0) {
+      avisos.appendChild(montarAviso('atencao', '&#9679;',
+        '<b>Suas saídas passam as entradas em cerca de ' + E.formatarBRL(r.deficitMensal) +
+        ' por mês.</b> Enquanto isso durar não existe sobra estável para investir: ' +
+        'o valor de hoje sai do que já está em caixa e encolhe conforme você aumenta o horizonte.'));
+    }
+
     if (estado.exemplo) $('#banner-exemplo').classList.remove('oculto');
     else $('#banner-exemplo').classList.add('oculto');
 
@@ -266,7 +322,7 @@
     }
     var totalPlano = r.plano.linhas.reduce(function (soma, l) { return soma + l.centavos; }, 0);
     fato(fatos, 'Total do plano', E.formatarBRL(totalPlano),
-         r.plano.linhas.length + ' aporte(s) até ' + E.rotuloCurto(r.diaFimExibicao));
+         r.plano.linhas.length + ' aporte(s) até ' + comAno(r.diaFimExibicao));
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
@@ -431,7 +487,7 @@
       var valor = l.centavos;
       acumulado += valor;
       corpo.appendChild(criar('tr', { class: l.dia === r.diaInicio ? 'hoje' : '' }, [
-        criar('td', { text: E.rotuloCurto(l.dia) }),
+        criar('td', { text: comAno(l.dia) }),
         criar('td', { text: textoDiaSemana(l.dia) }),
         criar('td', { text: motivo }),
         criar('td', { class: 'num', text: E.formatarBRL(valor) }),
@@ -466,7 +522,7 @@
       if (d.saldo < 0) classe.push('negativo');
       if (d.dia === r.diaInicio) classe.push('hoje');
       corpo.appendChild(criar('tr', { class: classe.join(' ') }, [
-        criar('td', { text: E.rotuloCurto(d.dia) }),
+        criar('td', { text: comAno(d.dia) }),
         criar('td', { text: textoDiaSemana(d.dia) }),
         nomes,
         criar('td', { class: 'num', text: d.entradas ? E.formatarBRL(d.entradas) : '' }),
@@ -910,6 +966,12 @@
       });
     }
     dinheiro('#cfg-saldo', 'saldoInicial');
+    // Saber QUANDO o saldo foi digitado e' o que permite avisar que ele envelheceu.
+    $('#cfg-saldo').addEventListener('change', function () {
+      estado.saldoInformadoEm = estado.dataReferencia;
+      dataFoiAvancada = false;
+      aplicar();
+    });
     dinheiro('#cfg-limite', 'limiteNegativo');
     dinheiro('#cfg-colchao', 'colchao');
     dinheiro('#cfg-minimo', 'aporteMinimo');
@@ -1038,6 +1100,7 @@
     preencherConfig();
     ligarConfig();
     aplicar();
+    if (dataFoiAvancada) salvar();
     registrarServiceWorker();
     window.addEventListener('resize', function () { renderGrafico(calcular()); });
   }

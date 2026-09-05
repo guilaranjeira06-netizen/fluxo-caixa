@@ -20,8 +20,9 @@ Quatro peças, nessa ordem.
 
 ### 1. Regras, não lançamentos
 
-Você cadastra a **regra** ("salário, 5º dia útil, R$ 8.500"), não cada
-pagamento. A regra se expande sozinha nos meses seguintes. Formas de agendar:
+Você cadastra a **regra** ("salário, 5º dia útil, R$ 8.500") uma única vez, não
+cada pagamento. Ela se repete sozinha em todos os meses seguintes, para sempre —
+não há fechamento mensal nem re-cadastro. Formas de agendar:
 
 | Agenda | Para quê |
 |---|---|
@@ -41,7 +42,14 @@ Duas coisas que o cálculo na mão erra com frequência:
   antecipa, adia ou mantém.
 
 Cada regra aceita vigência (começa em / termina em) e valor diferente em meses
-específicos — `2026-12 = 12000` para o mês do 13º, por exemplo.
+específicos — `2026-12 = 12000` para o mês do 13º, por exemplo. Ou seja: o que é
+fixo você deixa cadastrado e esquece; o que varia (a fatura do cartão) você
+sobrescreve só no mês em que mudou, sem mexer na regra.
+
+**O que precisa de manutenção é só o dia a dia:** o *saldo hoje* e os
+recebimentos avulsos que forem confirmando. A data de referência anda sozinha
+para o dia de hoje quando você abre o app, e ele avisa quando o saldo em conta
+foi informado numa data anterior — número velho é pior que número nenhum.
 
 ### 2. Projeção diária
 
@@ -52,6 +60,31 @@ dinheiro, um centavo de erro de arredondamento muda a resposta de "pode" para
 A projeção calcula 60 dias **além** do horizonte que você vê. Sem essa folga,
 uma sequência negativa que começa perto do fim pareceria não fechar nunca, só
 porque a entrada que a cobre está logo depois da borda.
+
+#### Para que serve o horizonte
+
+O horizonte **não é o período que você controla** — é até onde a projeção
+enxerga antes de responder "quanto dá para tirar hoje". Ele precisa alcançar
+pelo menos o próximo par recebimento/pagamento, senão a conta ignora uma saída
+que já está contratada.
+
+Passado esse mínimo, o horizonte quase sempre é indiferente. Com as entradas
+maiores que as saídas, o que trava o valor de hoje é sempre o vale entre dois
+recebimentos, e ele está logo ali:
+
+| Situação | 2 meses | 4 meses | 12 meses |
+|---|---|---|---|
+| Mês fecha no azul (+R$ 1.500) | R$ 4.200 | R$ 4.200 | R$ 4.200 |
+| Mês empata exatamente | R$ 4.200 | R$ 4.200 | R$ 4.200 |
+| Mês fecha no vermelho (−R$ 500) | R$ 3.000 | R$ 2.000 | R$ 0 |
+
+Só a última linha muda, e ela muda por um motivo real: **se sai mais do que
+entra, não existe sobra — existe caixa acabando devagar.** Quanto mais longe a
+projeção olha, mais cedo ela vê a conta furar, e menos ela libera. Nesse caso o
+app avisa em quanto está o rombo mensal, para o número não parecer arbitrário.
+
+**Na prática: 3 ou 4 meses.** Aumente só para conferir o efeito de uma despesa
+grande lá na frente (IPVA, seguro, viagem).
 
 ### 3. As restrições da conta
 

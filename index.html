@@ -88,6 +88,7 @@
     <div class="grade-campos">
       <label class="campo">Saldo hoje
         <input type="text" id="cfg-saldo" inputmode="decimal" placeholder="0,00">
+        <span class="dica">o que est&aacute; na conta corrente agora</span>
       </label>
       <label class="campo">Data de refer&ecirc;ncia
         <input type="date" id="cfg-data">
@@ -124,6 +125,7 @@
         <span class="dica">n&atilde;o sugerir troco</span>
       </label>
       <label class="campo">Horizonte
+        <span class="dica">at&eacute; onde a proje&ccedil;&atilde;o enxerga</span>
         <select id="cfg-horizonte">
           <option value="2">2 meses</option>
           <option value="3">3 meses</option>
@@ -146,6 +148,11 @@
       <button id="btn-nova-avulso">+ Recebimento avulso</button>
       <button id="btn-nova-entrada">+ Entrada recorrente</button>
     </div>
+    <p class="subtitulo">
+      Cadastre uma vez e pronto: cada regra se repete sozinha todos os meses.
+      Para um m&ecirc;s fora do padr&atilde;o &mdash; a fatura do cart&atilde;o, o 13&ordm; &mdash; abra
+      <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha e informe s&oacute; aquele m&ecirc;s.
+    </p>
     <div class="regras" id="lista-entradas"></div>
     <div id="entradas-vazio" class="vazio oculto">Nenhuma entrada cadastrada.</div>
   </section>
