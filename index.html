@@ -98,9 +98,11 @@
   <!-- ================================================== PLANO DE APORTES -->
   <section class="cartao">
     <div class="cabecalho-secao"><h2>Quando d&aacute; para transferir</h2></div>
-    <p class="subtitulo">
-      O m&aacute;ximo em cada data, <b>na ordem</b>: cada linha j&aacute; conta que voc&ecirc; tirou as anteriores.
-    </p>
+    <details class="dobra ajuda">
+      <summary>como funciona</summary>
+      <p>O m&aacute;ximo em cada data, <b>na ordem</b>: cada linha j&aacute; conta que voc&ecirc; tirou as anteriores.
+         Tirar menos hoje sobra mais l&aacute; na frente.</p>
+    </details>
     <div class="rolagem"><table id="tabela-plano">
       <thead><tr>
         <th>Data</th><th>Dia</th><th>M&ecirc;s</th><th>Por que essa data</th>
@@ -118,11 +120,12 @@
       <button id="btn-nova-avulso">+ Avulsa</button>
       <button id="btn-nova-entrada">+ Recorrente</button>
     </div>
-    <p class="subtitulo">
-      Cadastre uma vez e pronto: cada regra se repete sozinha todos os meses.
-      Para um m&ecirc;s fora do padr&atilde;o &mdash; a fatura do cart&atilde;o, o 13&ordm; &mdash; abra
-      <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha.
-    </p>
+    <details class="dobra ajuda">
+      <summary>como funciona</summary>
+      <p>Cadastre uma vez e pronto: cada regra se repete sozinha todos os meses.
+         Para um m&ecirc;s fora do padr&atilde;o &mdash; a fatura do cart&atilde;o, o 13&ordm; &mdash; abra
+         <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha.</p>
+    </details>
     <div class="regras" id="lista-entradas"></div>
     <div id="entradas-vazio" class="vazio oculto">Nenhuma entrada cadastrada.</div>
   </section>
@@ -225,7 +228,7 @@
       <summary>Extrato projetado</summary>
       <div style="margin-top:14px">
         <p class="subtitulo">
-          Somente os dias com movimento e os dias no vermelho.
+          Dias com movimento e dias no vermelho.
           <label class="linha-check" style="display:inline-flex; margin-left:10px">
             <input type="checkbox" id="chk-todos-dias"> mostrar todos os dias
           </label>

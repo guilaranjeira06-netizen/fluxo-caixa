@@ -173,16 +173,36 @@ tr.hoje td { background: var(--superficie-2); }
 
 /* --------------------------------------------------------- lista de regras */
 .regras { display: grid; gap: 9px; }
+/*
+ * Cada campo tem posicao EXPLICITA na grade. Antes so' a descricao tinha, e no
+ * celular o resto caia no auto-placement: o campo de valor ia parar na coluna
+ * de 22px do checkbox e ficava impossivel de digitar - justo a acao principal.
+ */
 .regra {
-  display: grid; gap: 9px; align-items: end;
-  grid-template-columns: 22px minmax(140px, 1fr) 105px 152px 104px 132px 30px;
-  padding: 9px; border: 1px solid var(--borda); border-radius: 8px; background: var(--plano);
+  display: grid; gap: 9px 10px; align-items: end;
+  grid-template-columns: 22px minmax(130px, 1fr) 100px 148px 96px 124px 30px;
+  padding: 10px; border: 1px solid var(--borda); border-radius: 8px; background: var(--plano);
 }
+.regra .c-ativo   { grid-column: 1; }
+.regra .c-nome    { grid-column: 2; }
+.regra .c-valor   { grid-column: 3; }
+.regra .c-quando  { grid-column: 4; }
+.regra .c-detalhe { grid-column: 5; }
+.regra .c-ajuste  { grid-column: 6; }
+.regra .c-remover { grid-column: 7; }
 .regra.inativa { opacity: .5; }
 .regra .so-rotulo { font-size: 11px; color: var(--tinta-3); }
+/* Celular: duas colunas de campo, cada um no seu lugar, nada espremido. */
 @media (max-width: 880px) {
-  .regra { grid-template-columns: 22px 1fr 1fr 30px; }
-  .regra .largo { grid-column: 2 / -1; }
+  .regra { grid-template-columns: 26px 1fr 1fr 34px; }
+  .regra .c-ativo   { grid-column: 1; grid-row: 1; align-self: center; }
+  .regra .c-nome    { grid-column: 2 / 4; grid-row: 1; }
+  .regra .c-remover { grid-column: 4; grid-row: 1; align-self: center; justify-self: end; }
+  .regra .c-valor   { grid-column: 1 / 3; grid-row: 2; }
+  .regra .c-quando  { grid-column: 3 / 5; grid-row: 2; }
+  .regra .c-detalhe { grid-column: 1 / 3; grid-row: 3; }
+  .regra .c-ajuste  { grid-column: 3 / 5; grid-row: 3; }
+  .regra .regra-extra { grid-row: 4; }
 }
 .cabecalho-secao { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .cabecalho-secao h2 { margin: 0; }
@@ -239,6 +259,56 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
 
 /* Legenda de grafico de barras: amostra quadrada, nao risco de linha. */
 .legenda.barras i { width: 11px; height: 11px; border-radius: 3px; }
+
+/* -------------------------------------------------- densidade no celular */
+
+/* Ajuda longa fica recolhida: presente quando se procura, calada quando nao. */
+details.ajuda { margin: -4px 0 12px; }
+details.ajuda > summary { font-size: 12.5px; }
+details.ajuda p { margin: 8px 0 0; font-size: 13px; color: var(--tinta-2); }
+
+@media (max-width: 560px) {
+  .envelope { padding-left: calc(12px + env(safe-area-inset-left));
+              padding-right: calc(12px + env(safe-area-inset-right)); }
+  .cartao { padding: 14px; margin-bottom: 12px; }
+  .cartao > h2 { margin-bottom: 10px; }
+
+  /* Titulo e tema na primeira linha; o periodo desce sozinho. */
+  .topo { gap: 6px 10px; margin-bottom: 14px; }
+  .topo .legenda-topo { order: 3; flex-basis: 100%; font-size: 12px; }
+
+  /* O numero continua sendo o herói, mas sem engolir a tela. */
+  .heroi { font-size: 34px; }
+  .heroi-nota { font-size: 12.5px; }
+  .rotulo-heroi { font-size: 12.5px; }
+  .fato .k, .fato .v { font-size: 13px; }
+  .fato .v small { font-size: 11.5px; }
+  .subtitulo { font-size: 12.5px; }
+  .aviso { font-size: 12.5px; padding: 10px 11px; }
+
+  /* Botao de acao ocupa a largura: alvo de toque decente. */
+  #btn-registrar { width: 100%; padding: 11px; }
+}
+
+/*
+ * Tabelas no celular: numa largura de 360px, deixar tudo rolar de lado esconde
+ * justamente a coluna que interessa - o valor. Some com o secundario e o que
+ * importa fica visivel sem arrastar nada.
+ */
+@media (max-width: 560px) {
+  /* Plano: Data | Mes | Pode tirar. Fora: Dia, Por que, Acumulado. */
+  #tabela-plano th:nth-child(2), #tabela-plano td:nth-child(2),
+  #tabela-plano th:nth-child(4), #tabela-plano td:nth-child(4),
+  #tabela-plano th:nth-child(6), #tabela-plano td:nth-child(6) { display: none; }
+
+  /* Extrato: o dia da semana e' o primeiro a sair. */
+  #tabela-extrato th:nth-child(2), #tabela-extrato td:nth-child(2) { display: none; }
+
+  /* Transferencias: a observacao cede espaco para data e valor. */
+  #tabela-aportes th:nth-child(3), #tabela-aportes td:nth-child(3) { display: none; }
+
+  th, td { padding: 7px 6px; }
+}
 
 </style>
 </head>
@@ -322,9 +392,11 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
   <!-- ================================================== PLANO DE APORTES -->
   <section class="cartao">
     <div class="cabecalho-secao"><h2>Quando d&aacute; para transferir</h2></div>
-    <p class="subtitulo">
-      O m&aacute;ximo em cada data, <b>na ordem</b>: cada linha j&aacute; conta que voc&ecirc; tirou as anteriores.
-    </p>
+    <details class="dobra ajuda">
+      <summary>como funciona</summary>
+      <p>O m&aacute;ximo em cada data, <b>na ordem</b>: cada linha j&aacute; conta que voc&ecirc; tirou as anteriores.
+         Tirar menos hoje sobra mais l&aacute; na frente.</p>
+    </details>
     <div class="rolagem"><table id="tabela-plano">
       <thead><tr>
         <th>Data</th><th>Dia</th><th>M&ecirc;s</th><th>Por que essa data</th>
@@ -342,11 +414,12 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
       <button id="btn-nova-avulso">+ Avulsa</button>
       <button id="btn-nova-entrada">+ Recorrente</button>
     </div>
-    <p class="subtitulo">
-      Cadastre uma vez e pronto: cada regra se repete sozinha todos os meses.
-      Para um m&ecirc;s fora do padr&atilde;o &mdash; a fatura do cart&atilde;o, o 13&ordm; &mdash; abra
-      <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha.
-    </p>
+    <details class="dobra ajuda">
+      <summary>como funciona</summary>
+      <p>Cadastre uma vez e pronto: cada regra se repete sozinha todos os meses.
+         Para um m&ecirc;s fora do padr&atilde;o &mdash; a fatura do cart&atilde;o, o 13&ordm; &mdash; abra
+         <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha.</p>
+    </details>
     <div class="regras" id="lista-entradas"></div>
     <div id="entradas-vazio" class="vazio oculto">Nenhuma entrada cadastrada.</div>
   </section>
@@ -449,7 +522,7 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
       <summary>Extrato projetado</summary>
       <div style="margin-top:14px">
         <p class="subtitulo">
-          Somente os dias com movimento e os dias no vermelho.
+          Dias com movimento e dias no vermelho.
           <label class="linha-check" style="display:inline-flex; margin-left:10px">
             <input type="checkbox" id="chk-todos-dias"> mostrar todos os dias
           </label>
@@ -1208,11 +1281,15 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     return E.formatarBRL(centavos || 0).replace('R$ ', '');
   }
 
-  /** Centavos -> "R$ 1.200" para eixos: sem centavos, com sinal. */
-  function formatarCurto(centavos) {
+  /**
+   * Centavos -> "R$ 1.200" para eixos: sem centavos, com sinal.
+   * Em tela estreita o prefixo sai: "R$ 2.000" nao cabe na margem do eixo e
+   * aparecia cortado. O cifrao ja esta no titulo e nos valores das barras.
+   */
+  function formatarCurto(centavos, semMoeda) {
     var neg = centavos < 0;
     var reais = Math.round(Math.abs(centavos) / 100);
-    return (neg ? '-' : '') + 'R$ ' + reais.toLocaleString('pt-BR');
+    return (neg ? '-' : '') + (semMoeda ? '' : 'R$ ') + reais.toLocaleString('pt-BR');
   }
 
   function textoDiaSemana(dia) {
@@ -1369,16 +1446,17 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
                centavos: E.paraCentavos(a.valor), nota: a.nota || '' };
     }).sort(function (a, b) { return a.dia - b.dia; });
 
-    // Recua ate o mes ANTERIOR ao aporte mais antigo. Comecar a janela em cima
-    // dele deixaria o mes dele sem marco a frente, virando periodo parcial - e
-    // periodo parcial nao entra no grafico, entao a transferencia sumiria.
-    var diaHistorico = diaInicio;
-    if (aportes.length) {
-      var recuo = new Date(Math.min(diaInicio, aportes[0].dia) * E.MS_DIA);
-      recuo.setUTCDate(1);
-      recuo.setUTCMonth(recuo.getUTCMonth() - 1);
-      diaHistorico = Math.min(diaInicio, Math.floor(recuo.getTime() / E.MS_DIA));
-    }
+    // A janela dos periodos recua sempre ao mes anterior ao ponto mais antigo
+    // que interessa - hoje, ou a transferencia mais velha.
+    //
+    // Recuar SEMPRE, e nao so' quando ha aportes, e' o que faz o mes corrente
+    // aparecer. Comecando a janela hoje, o periodo que contem hoje nasce sem
+    // marco atras de si, vira "parcial" e o grafico o descarta - sumia justo o
+    // mes do numero em destaque.
+    var recuo = new Date(Math.min(diaInicio, aportes.length ? aportes[0].dia : diaInicio) * E.MS_DIA);
+    recuo.setUTCDate(1);
+    recuo.setUTCMonth(recuo.getUTCMonth() - 1);
+    var diaHistorico = Math.min(diaInicio, Math.floor(recuo.getTime() / E.MS_DIA));
     var marcos = marcosDoPeriodo(calendario, diaHistorico, diaFimCalculo);
     var periodos = E.calcularPeriodos(marcos, diaHistorico, diaFimExibicao);
     var periodoAtual = E.periodoDoDia(periodos, diaInicio);
@@ -1541,21 +1619,19 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
         avisos.appendChild(montarAviso('atencao', '&#9679;', usoDoVermelho));
       } else if (r.noPeriodo > 0) {
         avisos.appendChild(montarAviso('bom', '&#10003;',
-          'Com esses aportes a conta não fica negativa nenhum dia dentro do horizonte.'));
+          'A conta não fica negativa nenhum dia no horizonte.'));
       }
     }
 
     if (r.viavel && estado.saldoInformadoEm && estado.saldoInformadoEm !== estado.dataReferencia) {
       avisos.appendChild(montarAviso('atencao', '&#9679;',
-        '<b>Confira o saldo antes de transferir.</b> O valor em conta foi informado em ' +
-        dataLonga(estado.saldoInformadoEm) + ' e a projeção já está rodando a partir de ' +
-        dataLonga(estado.dataReferencia) + '.'));
+        '<b>Confira o saldo.</b> Foi informado em ' + dataLonga(estado.saldoInformadoEm) +
+        ' e hoje já é ' + dataLonga(estado.dataReferencia) + '.'));
     }
     if (r.deficitMensal > 0) {
       avisos.appendChild(montarAviso('atencao', '&#9679;',
-        '<b>Suas saídas passam as entradas em cerca de ' + E.formatarBRL(r.deficitMensal) +
-        ' por mês.</b> Enquanto isso durar não existe sobra estável para investir: ' +
-        'o valor de hoje sai do que já está em caixa e encolhe conforme você aumenta o horizonte.'));
+        '<b>Sai ' + E.formatarBRL(r.deficitMensal) + ' a mais do que entra, por mês.</b> ' +
+        'Não existe sobra estável: o valor de hoje sai do caixa que você já tem.'));
     }
 
     if (estado.exemplo) $('#banner-exemplo').classList.remove('oculto');
@@ -1572,7 +1648,7 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     })[0];
 
     fato(fatos, 'Disponível hoje', E.formatarBRL(r.sugeridoHoje),
-         'saldo em conta: ' + E.formatarBRL(E.paraCentavos(estado.saldoInicial)));
+         'em conta: ' + E.formatarBRL(E.paraCentavos(estado.saldoInicial)));
     if (r.periodoAtual && r.periodoAtual.realizado > 0) {
       fato(fatos, 'Já transferido em ' + r.periodoAtual.rotulo,
            E.formatarBRL(r.periodoAtual.realizado));
@@ -1580,7 +1656,7 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     fato(fatos, 'Piso do saldo', E.formatarBRL(r.restricoes.pisoCentavos),
          r.colchao > 0
            ? 'limite ' + E.formatarBRL(r.pisoBruto) + ' + colchão ' + E.formatarBRL(r.colchao)
-           : 'a projeção nunca pode passar disso');
+           : null);
     if (proxima) {
       fato(fatos, 'Próxima entrada', E.formatarBRL(proxima.centavos),
            proxima.nome + ' &middot; ' + dataLonga(proxima.iso));
@@ -1591,11 +1667,11 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     }
     var menor = r.avaliacaoPlano.menorSaldoDia;
     if (menor) {
-      fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso) + ', com o plano');
+      fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso));
     }
     var totalPlano = r.plano.linhas.reduce(function (soma, l) { return soma + l.centavos; }, 0);
     fato(fatos, 'Total até ' + comAno(r.diaFimExibicao), E.formatarBRL(totalPlano),
-         r.plano.linhas.length + ' aporte(s) no horizonte inteiro');
+         r.plano.linhas.length + ' aporte(s)');
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
@@ -1609,40 +1685,37 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     var maisQueIsso = zerado ? 'Tirar qualquer valor' : 'Tirar um real a mais';
 
     if (!zerado && t.trava === 'saldo') {
-      return '<b>O teto é o próprio saldo.</b> Você pode transferir tudo o que tem em conta: ' +
-             'as saídas até o próximo recebimento cabem dentro do vermelho permitido.';
+      return '<b>O teto é o próprio saldo</b> — as saídas até o próximo recebimento ' +
+             'cabem no vermelho permitido.';
     }
     if (!zerado && t.trava === 'piso') {
-      return '<b>O teto é o piso do saldo</b> (' + E.formatarBRL(r.restricoes.pisoCentavos) +
-             (r.colchao > 0 ? ', já com o colchão preservado' : '') + ').';
+      return '<b>O teto é o piso do saldo</b> (' + E.formatarBRL(r.restricoes.pisoCentavos) + ').';
     }
 
     var a = t.avaliacaoNoLimite;
     if (!a) return prefixo + 'O saldo já está comprometido com o que vem pela frente.';
 
     if (a.furoPiso) {
-      return prefixo + maisQueIsso + ' e o saldo de ' + dataLonga(a.furoPiso.iso) +
-             ' passaria de ' + E.formatarBRL(r.restricoes.pisoCentavos) +
-             (r.colchao > 0 ? ', o piso com o colchão preservado.' : ', o piso da conta.');
+      return prefixo + '<b>Trava em ' + dataLonga(a.furoPiso.iso) + '</b>: ' +
+             maisQueIsso.toLowerCase() + ' e o saldo passaria de ' +
+             E.formatarBRL(r.restricoes.pisoCentavos) + ', o piso da conta.';
     }
     if (a.estouroCiclo && a.modoFranquia === 'mensal') {
       var c = a.estouroCiclo.ciclo;
-      return prefixo + '<b>O que trava é a franquia de ' + c.rotulo + '.</b> ' + maisQueIsso +
-             ' e você usaria ' + c.dias + ' dos ' + r.restricoes.maxDiasNegativos +
-             ' dias de vermelho do ciclo' +
-             (c.jaUsados ? ', porque ' + c.jaUsados + ' já foram gastos antes de hoje' : '') +
-             ' &mdash; a partir daí o banco cobra juros.';
+      return prefixo + '<b>Trava na franquia de ' + c.rotulo + '</b>: ' +
+             maisQueIsso.toLowerCase() + ' e seriam ' + c.dias + ' de ' +
+             r.restricoes.maxDiasNegativos + ' dias no vermelho' +
+             (c.jaUsados ? ' (' + c.jaUsados + ' já gastos)' : '') + ', e aí conta juros.';
     }
     if (a.estouroCorrida) {
-      return prefixo + '<b>O que trava é o prazo do vermelho.</b> ' + maisQueIsso +
-             ' e a conta ficaria negativa por mais de ' + r.restricoes.maxDiasNegativos +
-             ' dias corridos a partir de ' + dataLonga(a.piorCorridaInicio.iso) +
-             ' &mdash; aí começa a contar juros.';
+      return prefixo + '<b>Trava no prazo do vermelho</b>: ' + maisQueIsso.toLowerCase() +
+             ' e passaria de ' + r.restricoes.maxDiasNegativos + ' dias corridos a partir de ' +
+             dataLonga(a.piorCorridaInicio.iso) + ', e aí conta juros.';
     }
     if (a.sequenciaAberta) {
-      return prefixo + '<b>O que trava é o fim da projeção.</b> ' + maisQueIsso +
+      return prefixo + '<b>Trava no fim da projeção</b>: ' + maisQueIsso.toLowerCase() +
              ' e o saldo ficaria negativo desde ' + dataLonga(a.sequenciaAberta.inicio.iso) +
-             ' sem entrada que cubra dentro do horizonte.';
+             ' sem entrada que cubra.';
     }
     return prefixo;
   }
@@ -1664,22 +1737,18 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
       if (!ciclos.length) return '';
 
       function descrever(c) {
-        var novos = c.dias - c.jaUsados;
-        return '<b>' + novos + ' dia' + (novos > 1 ? 's' : '') + '</b> em ' + c.rotulo +
-               ' (' + c.dias + ' de ' + limite + ' no ciclo' +
-               (c.jaUsados ? ', contando os ' + c.jaUsados + ' já usados' : '') + ')';
+        return '<b>' + c.dias + ' de ' + limite + '</b> em ' + c.rotulo +
+               (c.jaUsados ? ' (' + c.jaUsados + ' já usados antes)' : '');
       }
 
       // Num horizonte de meses, listar todo ciclo vira parede de texto. O que
       // interessa e' o ciclo atual (o que da' para agir hoje) e o mais apertado.
-      var texto = '<b>Esse plano usa o vermelho.</b> Consome ' + descrever(ciclos[0]);
+      var texto = '<b>Usa o vermelho:</b> ' + descrever(ciclos[0]);
       if (ciclos.length > 1) {
         var apertado = ciclos.slice(1).reduce(function (x, y) { return y.dias > x.dias ? y : x; });
-        texto += '. Nos meses seguintes o mais apertado é <b>' + apertado.rotulo + '</b>, com ' +
-                 apertado.dias + ' de ' + limite +
-                 (ciclos.length > 2 ? ' (ao todo ' + ciclos.length + ' meses com vermelho)' : '');
+        texto += '; depois, ' + apertado.rotulo + ' com ' + apertado.dias + ' de ' + limite;
       }
-      return texto + '. O pior saldo é ' + pior + '.';
+      return texto + '. Pior saldo ' + pior + '.';
     }
 
     var seqs = (a.sequencias || []).filter(function (s) { return s.dias > 0; });
@@ -1701,7 +1770,7 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
         return 'Nada mais neste mês. A próxima janela é <b>' + comAno(proximo.dia) +
                '</b>, com ' + E.formatarBRL(proximo.centavos) + '.';
       }
-      return 'Nada sobra neste mês dentro do horizonte projetado.';
+      return '';  // explicarTrava logo abaixo diz o motivo; repetir so' ocupa tela.
     }
     var hoje = r.sugeridoHoje;
     var resto = r.noPeriodo - hoje;
@@ -1787,16 +1856,20 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     }).slice(-12);
 
     var temAlgum = (r.aportes || []).length > 0;
-    $('#aportes-vazio').classList.toggle('oculto', temAlgum);
+    // Nao dizer "nenhuma transferencia" ao lado de barras: as barras claras sao
+    // projecao, e as duas frases juntas se contradizem aos olhos.
+    $('#aportes-vazio').classList.toggle('oculto', temAlgum || periodos.length > 0);
     $('#dobra-lista-aportes').classList.toggle('oculto', !temAlgum);
     $('#grafico-aportes').classList.toggle('oculto', periodos.length === 0);
     $('#legenda-aportes').classList.toggle('oculto', periodos.length === 0);
 
     var totalFeito = (r.aportes || []).reduce(function (x, a) { return x + a.centavos; }, 0);
     $('#sub-aportes').innerHTML = temAlgum
-      ? 'Já foram <b>' + E.formatarBRL(totalFeito) + '</b> em ' + r.aportes.length +
-        ' transferência(s). As barras claras são o que o plano ainda comporta.'
-      : 'O que você de fato mandou para a conta investimento, mês a mês.';
+      ? '<b>' + E.formatarBRL(totalFeito) + '</b> em ' + r.aportes.length +
+        ' transferência(s). Barra clara é o que ainda cabe.'
+      : (periodos.length
+          ? 'Ainda sem transferências. As barras mostram quanto cabe em cada mês.'
+          : 'O que você de fato mandou para a conta investimento, mês a mês.');
 
     renderBarras(periodos, r);
     renderListaAportes(r);
@@ -1806,8 +1879,30 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
   var estadoBarras = null;
   var barrasLigadas = false;
 
+  /**
+   * Escolhe o viewBox pela largura real do elemento.
+   *
+   * Com um viewBox fixo de 920 comprimido em 360px de celular, uma fonte de
+   * 11 unidades vira 4px na tela: rotulo de eixo ilegivel. Mantendo 1 unidade
+   * ~ 1 pixel, o texto sai do mesmo tamanho em qualquer aparelho.
+   */
+  function medidasDoGrafico(svg, alturaDesejada) {
+    var largura = Math.round(svg.getBoundingClientRect().width) || 920;
+    largura = Math.max(320, Math.min(920, largura));
+    var estreito = largura < 560;
+    return {
+      W: largura,
+      H: estreito ? Math.round(alturaDesejada * 0.86) : alturaDesejada,
+      estreito: estreito
+    };
+  }
+
   function renderBarras(periodos, r) {
     var svg = $('#grafico-aportes');
+    var m = medidasDoGrafico(svg, 300);
+    BW = m.W; BH = m.H;
+    BL = m.estreito ? 54 : 74;
+    BR = m.estreito ? 10 : 16;
     svg.setAttribute('viewBox', '0 0 ' + BW + ' ' + BH);
     svg.textContent = '';
     if (!periodos.length) { estadoBarras = null; return; }
@@ -1827,15 +1922,15 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     var max = topo * 1.15;
     var y = function (v) { return BT + (1 - v / max) * (BH - BT - BB); };
     var faixa = (BW - BL - BR) / periodos.length;
-    var largura = Math.min(64, faixa * 0.62);
+    var largura = Math.min(BW < 560 ? 42 : 64, faixa * 0.62);
 
-    var passo = passoBonito(max / 4);
+    var passo = passoBonito(max / (BW < 560 ? 3 : 4));
     for (var v = 0; v <= max; v += passo) {
       svg.appendChild(el('line', {
         x1: BL, x2: BW - BR, y1: y(v), y2: y(v),
         stroke: v === 0 ? 'var(--eixo)' : 'var(--grade)', 'stroke-width': v === 0 ? 1.5 : 1
       }));
-      svg.appendChild(texto(formatarCurto(v), {
+      svg.appendChild(texto(formatarCurto(v, BW < 560), {
         x: BL - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--tinta-3)'
       }));
     }
@@ -2039,6 +2134,10 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     var svg = $('#grafico');
     var dias = r.comPlano.dias.filter(function (d) { return d.dia <= r.diaFimExibicao; });
     var base = r.semAportes.dias.filter(function (d) { return d.dia <= r.diaFimExibicao; });
+    var m = medidasDoGrafico(svg, 320);
+    W = m.W; H = m.H;
+    L = m.estreito ? 56 : 80;
+    Rr = m.estreito ? 62 : 104;
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     svg.textContent = '';
     if (dias.length < 2) { estadoGrafico = null; return; }
@@ -2074,14 +2173,14 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     }
 
     // Grade horizontal em passos redondos.
-    var passo = passoBonito((max - min) / 5);
+    var passo = passoBonito((max - min) / (m.estreito ? 3 : 5));
     for (var v = Math.ceil(min / passo) * passo; v <= max; v += passo) {
       var ehZero = Math.abs(v) < 1;
       svg.appendChild(el('line', {
         x1: L, x2: W - Rr, y1: y(v), y2: y(v),
         stroke: ehZero ? 'var(--eixo)' : 'var(--grade)', 'stroke-width': ehZero ? 1.5 : 1
       }));
-      svg.appendChild(texto(formatarCurto(v), {
+      svg.appendChild(texto(formatarCurto(v, m.estreito), {
         x: L - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--tinta-3)'
       }));
     }
@@ -2092,9 +2191,11 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
         x1: L, x2: W - Rr, y1: y(piso), y2: y(piso),
         stroke: 'var(--critico)', 'stroke-width': 2, 'stroke-dasharray': '5 4'
       }));
-      svg.appendChild(texto('limite ' + formatarCurto(piso), {
-        x: W - Rr + 6, y: y(piso) + 4, 'font-size': 10.5, fill: 'var(--critico)'
-      }));
+      if (!m.estreito) {
+        svg.appendChild(texto('limite ' + formatarCurto(piso), {
+          x: W - Rr + 6, y: y(piso) + 4, 'font-size': 10.5, fill: 'var(--critico)'
+        }));
+      }
     }
 
     // Marcas de mes no eixo x.
@@ -2271,10 +2372,10 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     var ativo = criar('input', { type: 'checkbox' });
     ativo.checked = regra.ativo !== false;
     ativo.addEventListener('change', function () { regra.ativo = ativo.checked; aplicar(); });
-    linha.appendChild(criar('div', {}, [ativo]));
+    linha.appendChild(criar('div', { class: 'c-ativo' }, [ativo]));
 
-    linha.appendChild(campo('Descrição', inputTexto(regra.nome, function (v) { regra.nome = v; }), 'largo'));
-    linha.appendChild(campo('Valor', inputDinheiro(regra.valor, function (v) { regra.valor = v; })));
+    linha.appendChild(campo('Descrição', inputTexto(regra.nome, function (v) { regra.nome = v; }), 'c-nome'));
+    linha.appendChild(campo('Valor', inputDinheiro(regra.valor, function (v) { regra.valor = v; }), 'c-valor'));
 
     var agenda = regra.agenda || (regra.agenda = { tipo: 'diaFixo', dia: 1 });
     var selTipo = inputSelect(TIPOS_AGENDA, agenda.tipo, function (v) {
@@ -2284,28 +2385,29 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
       if (v === 'unica' && !agenda.data) agenda.data = estado.dataReferencia;
       aplicar();
     });
-    linha.appendChild(campo('Quando', selTipo));
+    linha.appendChild(campo('Quando', selTipo, 'c-quando'));
 
     var detalhe;
     if (agenda.tipo === 'diaFixo') {
-      detalhe = campo('Dia', inputNumero(agenda.dia, 1, 31, function (v) { agenda.dia = v; }));
+      detalhe = campo('Dia', inputNumero(agenda.dia, 1, 31, function (v) { agenda.dia = v; }), 'c-detalhe');
     } else if (agenda.tipo === 'diaUtil') {
-      detalhe = campo('Qual dia útil', inputNumero(agenda.n, 1, 23, function (v) { agenda.n = v; }));
+      detalhe = campo('Qual dia útil', inputNumero(agenda.n, 1, 23, function (v) { agenda.n = v; }), 'c-detalhe');
     } else if (agenda.tipo === 'unica') {
-      detalhe = campo('Data', inputData(agenda.data, function (v) { agenda.data = v; }));
+      detalhe = campo('Data', inputData(agenda.data, function (v) { agenda.data = v; }), 'c-detalhe');
     } else {
-      detalhe = campo('', criar('span', { class: 'so-rotulo', text: 'todo mês' }));
+      detalhe = campo('', criar('span', { class: 'so-rotulo', text: 'todo mês' }), 'c-detalhe');
     }
     linha.appendChild(detalhe);
 
     if (agenda.tipo === 'diaFixo' || agenda.tipo === 'unica') {
-      linha.appendChild(campo('Se cair em dia não útil',
-        inputSelect(AJUSTES, regra.ajuste || 'nenhum', function (v) { regra.ajuste = v; aplicar(); })));
+      linha.appendChild(campo('Se não for útil',
+        inputSelect(AJUSTES, regra.ajuste || 'nenhum', function (v) { regra.ajuste = v; aplicar(); }),
+        'c-ajuste'));
     } else {
-      linha.appendChild(criar('div'));
+      linha.appendChild(criar('div', { class: 'c-ajuste' }));
     }
 
-    linha.appendChild(criar('div', {}, [criar('button', {
+    linha.appendChild(criar('div', { class: 'c-remover' }, [criar('button', {
       class: 'discreto perigo', title: 'Remover', text: '×',
       onclick: function () {
         estado.regras = estado.regras.filter(function (x) { return x.id !== regra.id; });
@@ -2700,7 +2802,14 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
     aplicar();
     if (dataFoiAvancada) salvar();
     registrarServiceWorker();
-    window.addEventListener('resize', function () { renderGrafico(calcular()); });
+    // Girar o aparelho muda a largura, e a largura define o viewBox.
+    var esperando = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(esperando);
+      esperando = setTimeout(function () {
+        if (ultimoResultado) { renderGrafico(ultimoResultado); renderAportes(ultimoResultado); }
+      }, 150);
+    });
   }
 
   /**

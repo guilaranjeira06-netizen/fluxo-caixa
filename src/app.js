@@ -28,11 +28,15 @@
     return E.formatarBRL(centavos || 0).replace('R$ ', '');
   }
 
-  /** Centavos -> "R$ 1.200" para eixos: sem centavos, com sinal. */
-  function formatarCurto(centavos) {
+  /**
+   * Centavos -> "R$ 1.200" para eixos: sem centavos, com sinal.
+   * Em tela estreita o prefixo sai: "R$ 2.000" nao cabe na margem do eixo e
+   * aparecia cortado. O cifrao ja esta no titulo e nos valores das barras.
+   */
+  function formatarCurto(centavos, semMoeda) {
     var neg = centavos < 0;
     var reais = Math.round(Math.abs(centavos) / 100);
-    return (neg ? '-' : '') + 'R$ ' + reais.toLocaleString('pt-BR');
+    return (neg ? '-' : '') + (semMoeda ? '' : 'R$ ') + reais.toLocaleString('pt-BR');
   }
 
   function textoDiaSemana(dia) {
@@ -189,16 +193,17 @@
                centavos: E.paraCentavos(a.valor), nota: a.nota || '' };
     }).sort(function (a, b) { return a.dia - b.dia; });
 
-    // Recua ate o mes ANTERIOR ao aporte mais antigo. Comecar a janela em cima
-    // dele deixaria o mes dele sem marco a frente, virando periodo parcial - e
-    // periodo parcial nao entra no grafico, entao a transferencia sumiria.
-    var diaHistorico = diaInicio;
-    if (aportes.length) {
-      var recuo = new Date(Math.min(diaInicio, aportes[0].dia) * E.MS_DIA);
-      recuo.setUTCDate(1);
-      recuo.setUTCMonth(recuo.getUTCMonth() - 1);
-      diaHistorico = Math.min(diaInicio, Math.floor(recuo.getTime() / E.MS_DIA));
-    }
+    // A janela dos periodos recua sempre ao mes anterior ao ponto mais antigo
+    // que interessa - hoje, ou a transferencia mais velha.
+    //
+    // Recuar SEMPRE, e nao so' quando ha aportes, e' o que faz o mes corrente
+    // aparecer. Comecando a janela hoje, o periodo que contem hoje nasce sem
+    // marco atras de si, vira "parcial" e o grafico o descarta - sumia justo o
+    // mes do numero em destaque.
+    var recuo = new Date(Math.min(diaInicio, aportes.length ? aportes[0].dia : diaInicio) * E.MS_DIA);
+    recuo.setUTCDate(1);
+    recuo.setUTCMonth(recuo.getUTCMonth() - 1);
+    var diaHistorico = Math.min(diaInicio, Math.floor(recuo.getTime() / E.MS_DIA));
     var marcos = marcosDoPeriodo(calendario, diaHistorico, diaFimCalculo);
     var periodos = E.calcularPeriodos(marcos, diaHistorico, diaFimExibicao);
     var periodoAtual = E.periodoDoDia(periodos, diaInicio);
@@ -361,21 +366,19 @@
         avisos.appendChild(montarAviso('atencao', '&#9679;', usoDoVermelho));
       } else if (r.noPeriodo > 0) {
         avisos.appendChild(montarAviso('bom', '&#10003;',
-          'Com esses aportes a conta não fica negativa nenhum dia dentro do horizonte.'));
+          'A conta não fica negativa nenhum dia no horizonte.'));
       }
     }
 
     if (r.viavel && estado.saldoInformadoEm && estado.saldoInformadoEm !== estado.dataReferencia) {
       avisos.appendChild(montarAviso('atencao', '&#9679;',
-        '<b>Confira o saldo antes de transferir.</b> O valor em conta foi informado em ' +
-        dataLonga(estado.saldoInformadoEm) + ' e a projeção já está rodando a partir de ' +
-        dataLonga(estado.dataReferencia) + '.'));
+        '<b>Confira o saldo.</b> Foi informado em ' + dataLonga(estado.saldoInformadoEm) +
+        ' e hoje já é ' + dataLonga(estado.dataReferencia) + '.'));
     }
     if (r.deficitMensal > 0) {
       avisos.appendChild(montarAviso('atencao', '&#9679;',
-        '<b>Suas saídas passam as entradas em cerca de ' + E.formatarBRL(r.deficitMensal) +
-        ' por mês.</b> Enquanto isso durar não existe sobra estável para investir: ' +
-        'o valor de hoje sai do que já está em caixa e encolhe conforme você aumenta o horizonte.'));
+        '<b>Sai ' + E.formatarBRL(r.deficitMensal) + ' a mais do que entra, por mês.</b> ' +
+        'Não existe sobra estável: o valor de hoje sai do caixa que você já tem.'));
     }
 
     if (estado.exemplo) $('#banner-exemplo').classList.remove('oculto');
@@ -392,7 +395,7 @@
     })[0];
 
     fato(fatos, 'Disponível hoje', E.formatarBRL(r.sugeridoHoje),
-         'saldo em conta: ' + E.formatarBRL(E.paraCentavos(estado.saldoInicial)));
+         'em conta: ' + E.formatarBRL(E.paraCentavos(estado.saldoInicial)));
     if (r.periodoAtual && r.periodoAtual.realizado > 0) {
       fato(fatos, 'Já transferido em ' + r.periodoAtual.rotulo,
            E.formatarBRL(r.periodoAtual.realizado));
@@ -400,7 +403,7 @@
     fato(fatos, 'Piso do saldo', E.formatarBRL(r.restricoes.pisoCentavos),
          r.colchao > 0
            ? 'limite ' + E.formatarBRL(r.pisoBruto) + ' + colchão ' + E.formatarBRL(r.colchao)
-           : 'a projeção nunca pode passar disso');
+           : null);
     if (proxima) {
       fato(fatos, 'Próxima entrada', E.formatarBRL(proxima.centavos),
            proxima.nome + ' &middot; ' + dataLonga(proxima.iso));
@@ -411,11 +414,11 @@
     }
     var menor = r.avaliacaoPlano.menorSaldoDia;
     if (menor) {
-      fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso) + ', com o plano');
+      fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso));
     }
     var totalPlano = r.plano.linhas.reduce(function (soma, l) { return soma + l.centavos; }, 0);
     fato(fatos, 'Total até ' + comAno(r.diaFimExibicao), E.formatarBRL(totalPlano),
-         r.plano.linhas.length + ' aporte(s) no horizonte inteiro');
+         r.plano.linhas.length + ' aporte(s)');
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
@@ -429,40 +432,37 @@
     var maisQueIsso = zerado ? 'Tirar qualquer valor' : 'Tirar um real a mais';
 
     if (!zerado && t.trava === 'saldo') {
-      return '<b>O teto é o próprio saldo.</b> Você pode transferir tudo o que tem em conta: ' +
-             'as saídas até o próximo recebimento cabem dentro do vermelho permitido.';
+      return '<b>O teto é o próprio saldo</b> — as saídas até o próximo recebimento ' +
+             'cabem no vermelho permitido.';
     }
     if (!zerado && t.trava === 'piso') {
-      return '<b>O teto é o piso do saldo</b> (' + E.formatarBRL(r.restricoes.pisoCentavos) +
-             (r.colchao > 0 ? ', já com o colchão preservado' : '') + ').';
+      return '<b>O teto é o piso do saldo</b> (' + E.formatarBRL(r.restricoes.pisoCentavos) + ').';
     }
 
     var a = t.avaliacaoNoLimite;
     if (!a) return prefixo + 'O saldo já está comprometido com o que vem pela frente.';
 
     if (a.furoPiso) {
-      return prefixo + maisQueIsso + ' e o saldo de ' + dataLonga(a.furoPiso.iso) +
-             ' passaria de ' + E.formatarBRL(r.restricoes.pisoCentavos) +
-             (r.colchao > 0 ? ', o piso com o colchão preservado.' : ', o piso da conta.');
+      return prefixo + '<b>Trava em ' + dataLonga(a.furoPiso.iso) + '</b>: ' +
+             maisQueIsso.toLowerCase() + ' e o saldo passaria de ' +
+             E.formatarBRL(r.restricoes.pisoCentavos) + ', o piso da conta.';
     }
     if (a.estouroCiclo && a.modoFranquia === 'mensal') {
       var c = a.estouroCiclo.ciclo;
-      return prefixo + '<b>O que trava é a franquia de ' + c.rotulo + '.</b> ' + maisQueIsso +
-             ' e você usaria ' + c.dias + ' dos ' + r.restricoes.maxDiasNegativos +
-             ' dias de vermelho do ciclo' +
-             (c.jaUsados ? ', porque ' + c.jaUsados + ' já foram gastos antes de hoje' : '') +
-             ' &mdash; a partir daí o banco cobra juros.';
+      return prefixo + '<b>Trava na franquia de ' + c.rotulo + '</b>: ' +
+             maisQueIsso.toLowerCase() + ' e seriam ' + c.dias + ' de ' +
+             r.restricoes.maxDiasNegativos + ' dias no vermelho' +
+             (c.jaUsados ? ' (' + c.jaUsados + ' já gastos)' : '') + ', e aí conta juros.';
     }
     if (a.estouroCorrida) {
-      return prefixo + '<b>O que trava é o prazo do vermelho.</b> ' + maisQueIsso +
-             ' e a conta ficaria negativa por mais de ' + r.restricoes.maxDiasNegativos +
-             ' dias corridos a partir de ' + dataLonga(a.piorCorridaInicio.iso) +
-             ' &mdash; aí começa a contar juros.';
+      return prefixo + '<b>Trava no prazo do vermelho</b>: ' + maisQueIsso.toLowerCase() +
+             ' e passaria de ' + r.restricoes.maxDiasNegativos + ' dias corridos a partir de ' +
+             dataLonga(a.piorCorridaInicio.iso) + ', e aí conta juros.';
     }
     if (a.sequenciaAberta) {
-      return prefixo + '<b>O que trava é o fim da projeção.</b> ' + maisQueIsso +
+      return prefixo + '<b>Trava no fim da projeção</b>: ' + maisQueIsso.toLowerCase() +
              ' e o saldo ficaria negativo desde ' + dataLonga(a.sequenciaAberta.inicio.iso) +
-             ' sem entrada que cubra dentro do horizonte.';
+             ' sem entrada que cubra.';
     }
     return prefixo;
   }
@@ -484,22 +484,18 @@
       if (!ciclos.length) return '';
 
       function descrever(c) {
-        var novos = c.dias - c.jaUsados;
-        return '<b>' + novos + ' dia' + (novos > 1 ? 's' : '') + '</b> em ' + c.rotulo +
-               ' (' + c.dias + ' de ' + limite + ' no ciclo' +
-               (c.jaUsados ? ', contando os ' + c.jaUsados + ' já usados' : '') + ')';
+        return '<b>' + c.dias + ' de ' + limite + '</b> em ' + c.rotulo +
+               (c.jaUsados ? ' (' + c.jaUsados + ' já usados antes)' : '');
       }
 
       // Num horizonte de meses, listar todo ciclo vira parede de texto. O que
       // interessa e' o ciclo atual (o que da' para agir hoje) e o mais apertado.
-      var texto = '<b>Esse plano usa o vermelho.</b> Consome ' + descrever(ciclos[0]);
+      var texto = '<b>Usa o vermelho:</b> ' + descrever(ciclos[0]);
       if (ciclos.length > 1) {
         var apertado = ciclos.slice(1).reduce(function (x, y) { return y.dias > x.dias ? y : x; });
-        texto += '. Nos meses seguintes o mais apertado é <b>' + apertado.rotulo + '</b>, com ' +
-                 apertado.dias + ' de ' + limite +
-                 (ciclos.length > 2 ? ' (ao todo ' + ciclos.length + ' meses com vermelho)' : '');
+        texto += '; depois, ' + apertado.rotulo + ' com ' + apertado.dias + ' de ' + limite;
       }
-      return texto + '. O pior saldo é ' + pior + '.';
+      return texto + '. Pior saldo ' + pior + '.';
     }
 
     var seqs = (a.sequencias || []).filter(function (s) { return s.dias > 0; });
@@ -521,7 +517,7 @@
         return 'Nada mais neste mês. A próxima janela é <b>' + comAno(proximo.dia) +
                '</b>, com ' + E.formatarBRL(proximo.centavos) + '.';
       }
-      return 'Nada sobra neste mês dentro do horizonte projetado.';
+      return '';  // explicarTrava logo abaixo diz o motivo; repetir so' ocupa tela.
     }
     var hoje = r.sugeridoHoje;
     var resto = r.noPeriodo - hoje;
@@ -607,16 +603,20 @@
     }).slice(-12);
 
     var temAlgum = (r.aportes || []).length > 0;
-    $('#aportes-vazio').classList.toggle('oculto', temAlgum);
+    // Nao dizer "nenhuma transferencia" ao lado de barras: as barras claras sao
+    // projecao, e as duas frases juntas se contradizem aos olhos.
+    $('#aportes-vazio').classList.toggle('oculto', temAlgum || periodos.length > 0);
     $('#dobra-lista-aportes').classList.toggle('oculto', !temAlgum);
     $('#grafico-aportes').classList.toggle('oculto', periodos.length === 0);
     $('#legenda-aportes').classList.toggle('oculto', periodos.length === 0);
 
     var totalFeito = (r.aportes || []).reduce(function (x, a) { return x + a.centavos; }, 0);
     $('#sub-aportes').innerHTML = temAlgum
-      ? 'Já foram <b>' + E.formatarBRL(totalFeito) + '</b> em ' + r.aportes.length +
-        ' transferência(s). As barras claras são o que o plano ainda comporta.'
-      : 'O que você de fato mandou para a conta investimento, mês a mês.';
+      ? '<b>' + E.formatarBRL(totalFeito) + '</b> em ' + r.aportes.length +
+        ' transferência(s). Barra clara é o que ainda cabe.'
+      : (periodos.length
+          ? 'Ainda sem transferências. As barras mostram quanto cabe em cada mês.'
+          : 'O que você de fato mandou para a conta investimento, mês a mês.');
 
     renderBarras(periodos, r);
     renderListaAportes(r);
@@ -626,8 +626,30 @@
   var estadoBarras = null;
   var barrasLigadas = false;
 
+  /**
+   * Escolhe o viewBox pela largura real do elemento.
+   *
+   * Com um viewBox fixo de 920 comprimido em 360px de celular, uma fonte de
+   * 11 unidades vira 4px na tela: rotulo de eixo ilegivel. Mantendo 1 unidade
+   * ~ 1 pixel, o texto sai do mesmo tamanho em qualquer aparelho.
+   */
+  function medidasDoGrafico(svg, alturaDesejada) {
+    var largura = Math.round(svg.getBoundingClientRect().width) || 920;
+    largura = Math.max(320, Math.min(920, largura));
+    var estreito = largura < 560;
+    return {
+      W: largura,
+      H: estreito ? Math.round(alturaDesejada * 0.86) : alturaDesejada,
+      estreito: estreito
+    };
+  }
+
   function renderBarras(periodos, r) {
     var svg = $('#grafico-aportes');
+    var m = medidasDoGrafico(svg, 300);
+    BW = m.W; BH = m.H;
+    BL = m.estreito ? 54 : 74;
+    BR = m.estreito ? 10 : 16;
     svg.setAttribute('viewBox', '0 0 ' + BW + ' ' + BH);
     svg.textContent = '';
     if (!periodos.length) { estadoBarras = null; return; }
@@ -647,15 +669,15 @@
     var max = topo * 1.15;
     var y = function (v) { return BT + (1 - v / max) * (BH - BT - BB); };
     var faixa = (BW - BL - BR) / periodos.length;
-    var largura = Math.min(64, faixa * 0.62);
+    var largura = Math.min(BW < 560 ? 42 : 64, faixa * 0.62);
 
-    var passo = passoBonito(max / 4);
+    var passo = passoBonito(max / (BW < 560 ? 3 : 4));
     for (var v = 0; v <= max; v += passo) {
       svg.appendChild(el('line', {
         x1: BL, x2: BW - BR, y1: y(v), y2: y(v),
         stroke: v === 0 ? 'var(--eixo)' : 'var(--grade)', 'stroke-width': v === 0 ? 1.5 : 1
       }));
-      svg.appendChild(texto(formatarCurto(v), {
+      svg.appendChild(texto(formatarCurto(v, BW < 560), {
         x: BL - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--tinta-3)'
       }));
     }
@@ -859,6 +881,10 @@
     var svg = $('#grafico');
     var dias = r.comPlano.dias.filter(function (d) { return d.dia <= r.diaFimExibicao; });
     var base = r.semAportes.dias.filter(function (d) { return d.dia <= r.diaFimExibicao; });
+    var m = medidasDoGrafico(svg, 320);
+    W = m.W; H = m.H;
+    L = m.estreito ? 56 : 80;
+    Rr = m.estreito ? 62 : 104;
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     svg.textContent = '';
     if (dias.length < 2) { estadoGrafico = null; return; }
@@ -894,14 +920,14 @@
     }
 
     // Grade horizontal em passos redondos.
-    var passo = passoBonito((max - min) / 5);
+    var passo = passoBonito((max - min) / (m.estreito ? 3 : 5));
     for (var v = Math.ceil(min / passo) * passo; v <= max; v += passo) {
       var ehZero = Math.abs(v) < 1;
       svg.appendChild(el('line', {
         x1: L, x2: W - Rr, y1: y(v), y2: y(v),
         stroke: ehZero ? 'var(--eixo)' : 'var(--grade)', 'stroke-width': ehZero ? 1.5 : 1
       }));
-      svg.appendChild(texto(formatarCurto(v), {
+      svg.appendChild(texto(formatarCurto(v, m.estreito), {
         x: L - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--tinta-3)'
       }));
     }
@@ -912,9 +938,11 @@
         x1: L, x2: W - Rr, y1: y(piso), y2: y(piso),
         stroke: 'var(--critico)', 'stroke-width': 2, 'stroke-dasharray': '5 4'
       }));
-      svg.appendChild(texto('limite ' + formatarCurto(piso), {
-        x: W - Rr + 6, y: y(piso) + 4, 'font-size': 10.5, fill: 'var(--critico)'
-      }));
+      if (!m.estreito) {
+        svg.appendChild(texto('limite ' + formatarCurto(piso), {
+          x: W - Rr + 6, y: y(piso) + 4, 'font-size': 10.5, fill: 'var(--critico)'
+        }));
+      }
     }
 
     // Marcas de mes no eixo x.
@@ -1091,10 +1119,10 @@
     var ativo = criar('input', { type: 'checkbox' });
     ativo.checked = regra.ativo !== false;
     ativo.addEventListener('change', function () { regra.ativo = ativo.checked; aplicar(); });
-    linha.appendChild(criar('div', {}, [ativo]));
+    linha.appendChild(criar('div', { class: 'c-ativo' }, [ativo]));
 
-    linha.appendChild(campo('Descrição', inputTexto(regra.nome, function (v) { regra.nome = v; }), 'largo'));
-    linha.appendChild(campo('Valor', inputDinheiro(regra.valor, function (v) { regra.valor = v; })));
+    linha.appendChild(campo('Descrição', inputTexto(regra.nome, function (v) { regra.nome = v; }), 'c-nome'));
+    linha.appendChild(campo('Valor', inputDinheiro(regra.valor, function (v) { regra.valor = v; }), 'c-valor'));
 
     var agenda = regra.agenda || (regra.agenda = { tipo: 'diaFixo', dia: 1 });
     var selTipo = inputSelect(TIPOS_AGENDA, agenda.tipo, function (v) {
@@ -1104,28 +1132,29 @@
       if (v === 'unica' && !agenda.data) agenda.data = estado.dataReferencia;
       aplicar();
     });
-    linha.appendChild(campo('Quando', selTipo));
+    linha.appendChild(campo('Quando', selTipo, 'c-quando'));
 
     var detalhe;
     if (agenda.tipo === 'diaFixo') {
-      detalhe = campo('Dia', inputNumero(agenda.dia, 1, 31, function (v) { agenda.dia = v; }));
+      detalhe = campo('Dia', inputNumero(agenda.dia, 1, 31, function (v) { agenda.dia = v; }), 'c-detalhe');
     } else if (agenda.tipo === 'diaUtil') {
-      detalhe = campo('Qual dia útil', inputNumero(agenda.n, 1, 23, function (v) { agenda.n = v; }));
+      detalhe = campo('Qual dia útil', inputNumero(agenda.n, 1, 23, function (v) { agenda.n = v; }), 'c-detalhe');
     } else if (agenda.tipo === 'unica') {
-      detalhe = campo('Data', inputData(agenda.data, function (v) { agenda.data = v; }));
+      detalhe = campo('Data', inputData(agenda.data, function (v) { agenda.data = v; }), 'c-detalhe');
     } else {
-      detalhe = campo('', criar('span', { class: 'so-rotulo', text: 'todo mês' }));
+      detalhe = campo('', criar('span', { class: 'so-rotulo', text: 'todo mês' }), 'c-detalhe');
     }
     linha.appendChild(detalhe);
 
     if (agenda.tipo === 'diaFixo' || agenda.tipo === 'unica') {
-      linha.appendChild(campo('Se cair em dia não útil',
-        inputSelect(AJUSTES, regra.ajuste || 'nenhum', function (v) { regra.ajuste = v; aplicar(); })));
+      linha.appendChild(campo('Se não for útil',
+        inputSelect(AJUSTES, regra.ajuste || 'nenhum', function (v) { regra.ajuste = v; aplicar(); }),
+        'c-ajuste'));
     } else {
-      linha.appendChild(criar('div'));
+      linha.appendChild(criar('div', { class: 'c-ajuste' }));
     }
 
-    linha.appendChild(criar('div', {}, [criar('button', {
+    linha.appendChild(criar('div', { class: 'c-remover' }, [criar('button', {
       class: 'discreto perigo', title: 'Remover', text: '×',
       onclick: function () {
         estado.regras = estado.regras.filter(function (x) { return x.id !== regra.id; });
@@ -1520,7 +1549,14 @@
     aplicar();
     if (dataFoiAvancada) salvar();
     registrarServiceWorker();
-    window.addEventListener('resize', function () { renderGrafico(calcular()); });
+    // Girar o aparelho muda a largura, e a largura define o viewBox.
+    var esperando = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(esperando);
+      esperando = setTimeout(function () {
+        if (ultimoResultado) { renderGrafico(ultimoResultado); renderAportes(ultimoResultado); }
+      }, 150);
+    });
   }
 
   /**

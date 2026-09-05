@@ -164,16 +164,36 @@ tr.hoje td { background: var(--superficie-2); }
 
 /* --------------------------------------------------------- lista de regras */
 .regras { display: grid; gap: 9px; }
+/*
+ * Cada campo tem posicao EXPLICITA na grade. Antes so' a descricao tinha, e no
+ * celular o resto caia no auto-placement: o campo de valor ia parar na coluna
+ * de 22px do checkbox e ficava impossivel de digitar - justo a acao principal.
+ */
 .regra {
-  display: grid; gap: 9px; align-items: end;
-  grid-template-columns: 22px minmax(140px, 1fr) 105px 152px 104px 132px 30px;
-  padding: 9px; border: 1px solid var(--borda); border-radius: 8px; background: var(--plano);
+  display: grid; gap: 9px 10px; align-items: end;
+  grid-template-columns: 22px minmax(130px, 1fr) 100px 148px 96px 124px 30px;
+  padding: 10px; border: 1px solid var(--borda); border-radius: 8px; background: var(--plano);
 }
+.regra .c-ativo   { grid-column: 1; }
+.regra .c-nome    { grid-column: 2; }
+.regra .c-valor   { grid-column: 3; }
+.regra .c-quando  { grid-column: 4; }
+.regra .c-detalhe { grid-column: 5; }
+.regra .c-ajuste  { grid-column: 6; }
+.regra .c-remover { grid-column: 7; }
 .regra.inativa { opacity: .5; }
 .regra .so-rotulo { font-size: 11px; color: var(--tinta-3); }
+/* Celular: duas colunas de campo, cada um no seu lugar, nada espremido. */
 @media (max-width: 880px) {
-  .regra { grid-template-columns: 22px 1fr 1fr 30px; }
-  .regra .largo { grid-column: 2 / -1; }
+  .regra { grid-template-columns: 26px 1fr 1fr 34px; }
+  .regra .c-ativo   { grid-column: 1; grid-row: 1; align-self: center; }
+  .regra .c-nome    { grid-column: 2 / 4; grid-row: 1; }
+  .regra .c-remover { grid-column: 4; grid-row: 1; align-self: center; justify-self: end; }
+  .regra .c-valor   { grid-column: 1 / 3; grid-row: 2; }
+  .regra .c-quando  { grid-column: 3 / 5; grid-row: 2; }
+  .regra .c-detalhe { grid-column: 1 / 3; grid-row: 3; }
+  .regra .c-ajuste  { grid-column: 3 / 5; grid-row: 3; }
+  .regra .regra-extra { grid-row: 4; }
 }
 .cabecalho-secao { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .cabecalho-secao h2 { margin: 0; }
@@ -230,3 +250,53 @@ svg.grafico g.coluna:hover rect.barra { opacity: .82; }
 
 /* Legenda de grafico de barras: amostra quadrada, nao risco de linha. */
 .legenda.barras i { width: 11px; height: 11px; border-radius: 3px; }
+
+/* -------------------------------------------------- densidade no celular */
+
+/* Ajuda longa fica recolhida: presente quando se procura, calada quando nao. */
+details.ajuda { margin: -4px 0 12px; }
+details.ajuda > summary { font-size: 12.5px; }
+details.ajuda p { margin: 8px 0 0; font-size: 13px; color: var(--tinta-2); }
+
+@media (max-width: 560px) {
+  .envelope { padding-left: calc(12px + env(safe-area-inset-left));
+              padding-right: calc(12px + env(safe-area-inset-right)); }
+  .cartao { padding: 14px; margin-bottom: 12px; }
+  .cartao > h2 { margin-bottom: 10px; }
+
+  /* Titulo e tema na primeira linha; o periodo desce sozinho. */
+  .topo { gap: 6px 10px; margin-bottom: 14px; }
+  .topo .legenda-topo { order: 3; flex-basis: 100%; font-size: 12px; }
+
+  /* O numero continua sendo o herói, mas sem engolir a tela. */
+  .heroi { font-size: 34px; }
+  .heroi-nota { font-size: 12.5px; }
+  .rotulo-heroi { font-size: 12.5px; }
+  .fato .k, .fato .v { font-size: 13px; }
+  .fato .v small { font-size: 11.5px; }
+  .subtitulo { font-size: 12.5px; }
+  .aviso { font-size: 12.5px; padding: 10px 11px; }
+
+  /* Botao de acao ocupa a largura: alvo de toque decente. */
+  #btn-registrar { width: 100%; padding: 11px; }
+}
+
+/*
+ * Tabelas no celular: numa largura de 360px, deixar tudo rolar de lado esconde
+ * justamente a coluna que interessa - o valor. Some com o secundario e o que
+ * importa fica visivel sem arrastar nada.
+ */
+@media (max-width: 560px) {
+  /* Plano: Data | Mes | Pode tirar. Fora: Dia, Por que, Acumulado. */
+  #tabela-plano th:nth-child(2), #tabela-plano td:nth-child(2),
+  #tabela-plano th:nth-child(4), #tabela-plano td:nth-child(4),
+  #tabela-plano th:nth-child(6), #tabela-plano td:nth-child(6) { display: none; }
+
+  /* Extrato: o dia da semana e' o primeiro a sair. */
+  #tabela-extrato th:nth-child(2), #tabela-extrato td:nth-child(2) { display: none; }
+
+  /* Transferencias: a observacao cede espaco para data e valor. */
+  #tabela-aportes th:nth-child(3), #tabela-aportes td:nth-child(3) { display: none; }
+
+  th, td { padding: 7px 6px; }
+}
