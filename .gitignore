@@ -1,0 +1,6 @@
+node_modules/
+package-lock.json
+.tirar.js
+.dbg*.js
+.inter.js
+.shot*.js

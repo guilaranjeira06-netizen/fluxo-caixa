@@ -1,0 +1,10 @@
+{
+  "name": "fluxo-caixa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calculadora de fluxo de caixa pessoal: quanto da para investir sem furar a conta",
+  "scripts": {
+    "test": "node --test test/",
+    "build": "node build.js"
+  }
+}
