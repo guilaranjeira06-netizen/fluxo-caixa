@@ -183,7 +183,7 @@ dia, quanto falta e qual restrição quebrou.
 
 ```
 npm test              # 42 testes do motor de cálculo
-node build.js         # gera dist/fluxo-caixa.html, arquivo único
+node build.js         # gera dist/fluxo-caixa.html e monta site/
 ```
 
 `dist/fluxo-caixa.html` tem CSS e JS embutidos — é o arquivo para mandar por
@@ -194,20 +194,35 @@ então use **Baixar backup (JSON)** e **Restaurar backup** para levá-los junto.
 
 O app é instalável: manifest, ícone e service worker (abre sem internet depois
 da primeira visita). Mas **"Adicionar à Tela de Início" exige um endereço
-https** — um arquivo solto no celular não vira aplicativo.
+https** — um arquivo solto no aparelho não vira aplicativo.
 
-O jeito mais direto é o GitHub Pages, que já vem configurado em
-`.github/workflows/pages.yml`:
+`node build.js` monta a pasta **`site/`**, que é exatamente o que precisa ir
+para o ar. Três caminhos, e a escolha depende de o repositório ser privado:
 
-1. No repositório: **Settings › Pages › Build and deployment › Source:
-   "GitHub Actions"**.
-2. Faça o push na branch padrão (ou rode o workflow à mão em **Actions ›
-   Publicar no GitHub Pages › Run workflow**).
-3. Abra o endereço publicado no **Safari** (no iPhone tem que ser o Safari),
-   toque em **Compartilhar › Adicionar à Tela de Início**.
+| Caminho | Custo | Repositório |
+|---|---|---|
+| Hospedagem estática por arrasto (Netlify Drop, Cloudflare Pages) | grátis | continua privado |
+| GitHub Pages | grátis **só se o repositório for público** | precisa ser público |
+| GitHub Pages com repositório privado | exige GitHub Pro/Team | continua privado |
 
-Fica com ícone próprio, abre em tela cheia sem barra de navegação e funciona no
-avião.
+**Pages em repositório privado no plano gratuito não funciona** — a opção nem
+aparece em Settings, e o workflow falha com "Resource not accessible by
+integration". O passo *Conferir se o GitHub Pages está ligado* existe para
+dizer isso em vez de deixar o erro cru.
+
+Se optar por tornar o repositório público, vale saber o que fica exposto: **nenhum
+valor seu** — a lista nasce zerada e os números vivem apenas no `localStorage`
+do seu navegador. O que aparece é o *nome* dos seus lançamentos na lista padrão
+(Insper, construtora, evolução de obra e afins), o que já diz algo sobre você.
+
+Com o endereço no ar, abra no **Safari** (no iPhone tem que ser o Safari), toque
+em **Compartilhar › Adicionar à Tela de Início**. Fica com ícone próprio, abre
+em tela cheia e funciona no avião.
+
+Para publicar pelo GitHub Pages depois de resolver o plano/visibilidade:
+**Settings › Pages › Build and deployment › Source: "GitHub Actions"**. O
+workflow em `.github/workflows/pages.yml` roda os testes e publica a cada push
+na branch padrão.
 
 **Dois cuidados com os dados**, e eles são reais:
 
@@ -227,7 +242,7 @@ avião.
 | `src/app.js` | estado, formulários, gráfico, tabelas |
 | `src/styles.css` | tokens de cor, tema claro e escuro |
 | `test/engine.test.js` | testes do motor |
-| `build.js` | empacota tudo num HTML só |
+| `build.js` | empacota tudo num HTML só e monta `site/` |
 | `sw.js` | service worker: abre sem internet |
 | `manifest.webmanifest` | nome, ícone e modo tela cheia |
 | `icones/` | ícone em SVG, PNGs gerados e o script que os gera |

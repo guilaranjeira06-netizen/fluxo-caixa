@@ -46,15 +46,25 @@ jobs:
         with:
           node-version: '22'
       - name: Montar o site
+        run: node build.js
+
+      # O erro cru do configure-pages quando o Pages esta desligado e
+      # "Resource not accessible by integration", que nao ajuda ninguem. Este
+      # passo diz o que fazer - inclusive o caso de repositorio privado em
+      # plano gratuito, onde o Pages simplesmente nao existe.
+      - name: Conferir se o GitHub Pages esta ligado
         run: |
-          node build.js
-          mkdir -p site
-          cp -r index.html manifest.webmanifest sw.js src icones dist site/
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          if [ "$codigo" = "404" ]; then
+            echo "::error title=Pages desligado::Ligue em Settings > Pages > Source: GitHub Actions. Em repositorio PRIVADO isso exige plano pago (Pro/Team); no plano gratuito, ou torne o repositorio publico, ou publique a pasta site/ em outro servico estatico."
+            exit 1
+          fi
+          echo "Pages respondeu $codigo - seguindo."
+
       - uses: actions/configure-pages@v5
-        # Liga o Pages sozinho na primeira execucao, para nao depender de
-        # ninguem lembrar de mexer em Settings.
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
