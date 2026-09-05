@@ -80,30 +80,30 @@ A projeção calcula 60 dias **além** do horizonte que você vê. Sem essa folg
 uma sequência negativa que começa perto do fim pareceria não fechar nunca, só
 porque a entrada que a cobre está logo depois da borda.
 
-#### Para que serve o horizonte
+#### O horizonte é uma lente, não uma variável do cálculo
 
-O horizonte **não é o período que você controla** — é até onde a projeção
-enxerga antes de responder "quanto dá para tirar hoje". Ele precisa alcançar
-pelo menos o próximo par recebimento/pagamento, senão a conta ignora uma saída
-que já está contratada.
+O solver enxerga **sempre os mesmos 150 dias**, independente do que você
+escolheu ver. O horizonte muda quantas linhas o plano mostra, quantas barras o
+gráfico desenha e até onde vai o extrato — nunca o valor.
 
-Passado esse mínimo, o horizonte quase sempre é indiferente. Com as entradas
-maiores que as saídas, o que trava o valor de hoje é sempre o vale entre dois
-recebimentos, e ele está logo ali:
+Isso não era assim, e a diferença era grave. Enquanto a janela do cálculo
+acompanhava a da tela, o mesmo dado dava respostas diferentes conforme o zoom:
 
-| Situação | 2 meses | 4 meses | 12 meses |
-|---|---|---|---|
-| Mês fecha no azul (+R$ 1.500) | R$ 4.200 | R$ 4.200 | R$ 4.200 |
-| Mês empata exatamente | R$ 4.200 | R$ 4.200 | R$ 4.200 |
-| Mês fecha no vermelho (−R$ 500) | R$ 3.000 | R$ 2.000 | R$ 0 |
+| Vista | Antes | Agora |
+|---|---|---|
+| 1 mês | R$ 2.700 | R$ 1.700 |
+| 3 meses | R$ 1.700 | R$ 1.700 |
+| 12 meses | R$ 0 | — (a vista para em 4 meses) |
 
-Só a última linha muda, e ela muda por um motivo real: **se sai mais do que
-entra, não existe sobra — existe caixa acabando devagar.** Quanto mais longe a
-projeção olha, mais cedo ela vê a conta furar, e menos ela libera. Nesse caso o
-app avisa em quanto está o rombo mensal, para o número não parecer arbitrário.
+Ou seja: "quanto posso transferir" dependia de um ajuste de tela. Quem olhasse
+um mês transferiria mil reais a mais do que podia.
 
-**Na prática: 3 ou 4 meses.** Aumente só para conferir o efeito de uma despesa
-grande lá na frente (IPVA, seguro, viagem).
+**Por que 150 dias.** Cobre cerca de cinco viradas de ciclo — o bastante para
+qualquer sequência negativa fechar e para os próximos pares
+recebimento/pagamento aparecerem. Além disso a projeção seria ficção: as regras
+se repetem, mas os valores dos meses distantes ainda vão mudar. O horizonte de
+exibição para em 4 meses justamente para nunca ultrapassar o que o solver
+verificou.
 
 ### 4. As restrições da conta
 

@@ -5,6 +5,12 @@
 
   var E = window.FluxoEngine;
   var CHAVE = 'fluxo-caixa/estado/v1';
+
+  /**
+   * Quantos dias o solver enxerga. Constante de proposito: ver mais ou menos
+   * na tela nao pode mudar quanto da' para transferir hoje.
+   */
+  var JANELA_SOLVER_DIAS = 150;
   var $ = function (sel) { return document.querySelector(sel); };
 
   // ------------------------------------------------------------- utilidades
@@ -159,6 +165,12 @@
     catch (err) { /* modo privado: segue sem persistir */ }
   }
 
+  /** Horizonte dentro do que a janela do solver cobre (estado salvo pode ter mais). */
+  function horizonteValido() {
+    var m = Number(estado.horizonteMeses) || 3;
+    return Math.max(1, Math.min(4, m));
+  }
+
   // --------------------------------------------------------------- calculo
 
   /**
@@ -177,17 +189,25 @@
     });
 
     var diaInicio = E.isoParaDia(estado.dataReferencia || hojeISO());
-    var meses = Number(estado.horizonteMeses) || 4;
+    var meses = horizonteValido();
     var dtFim = new Date(diaInicio * E.MS_DIA);
     dtFim.setUTCMonth(dtFim.getUTCMonth() + meses);
-    var diaFimExibicao = Math.floor(dtFim.getTime() / E.MS_DIA);
-    // A janela de CALCULO tem piso proprio, independente da de EXIBICAO.
+    var diaFimExibicao = Math.min(diaInicio + JANELA_SOLVER_DIAS,
+                                  Math.floor(dtFim.getTime() / E.MS_DIA));
+    // A janela do solver e' CONSTANTE. Nao e' um piso, nao acompanha o
+    // horizonte: e' sempre a mesma.
     //
-    // Horizonte e' escolha de quanto se quer VER. Se a verificacao encolhesse
-    // junto, olhar so' um mes liberaria dinheiro que estoura no mes seguinte -
-    // a vista mudaria a resposta, o que seria uma armadilha silenciosa. O piso
-    // de 150 dias mantem a mesma seguranca do padrao de tres meses.
-    var diaFimCalculo = Math.max(diaFimExibicao + 60, diaInicio + 150);
+    // Horizonte e' lente - quanto do resultado se quer ver. Se ele entrasse no
+    // calculo, o mesmo dado daria respostas diferentes conforme o zoom, e a
+    // pergunta "quanto posso transferir" passaria a depender de um ajuste de
+    // tela. Media antes desta mudanca, com o mesmo estado: 1 mes dava R$ 1.700
+    // e 12 meses dava R$ 0.
+    //
+    // Por que 150 dias: cobre umas cinco viradas de ciclo, o bastante para
+    // qualquer sequencia negativa fechar e para o proximo par recebimento/
+    // pagamento aparecer. Alem disso a projecao seria ficcao - as regras se
+    // repetem, mas os valores dos meses distantes ainda vao mudar.
+    var diaFimCalculo = diaInicio + JANELA_SOLVER_DIAS;
 
     var lancamentos = E.expandirRegras(estado.regras, diaInicio, diaFimCalculo, calendario);
 
@@ -459,8 +479,10 @@
       fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso));
     }
     var totalPlano = r.plano.linhas.reduce(function (soma, l) { return soma + l.centavos; }, 0);
-    fato(fatos, 'Total até ' + comAno(r.diaFimExibicao), E.formatarBRL(totalPlano),
-         r.plano.linhas.length + ' aporte(s)');
+    var ultimaLinha = r.plano.linhas[r.plano.linhas.length - 1];
+    fato(fatos, 'Total planejado', E.formatarBRL(totalPlano),
+         r.plano.linhas.length + ' aporte(s)' +
+         (ultimaLinha ? ' até ' + comAno(ultimaLinha.dia) : ''));
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
@@ -1350,7 +1372,7 @@
     $('#cfg-virada').value = Number(estado.diaViradaCiclo) || 1;
     $('#cfg-colchao').value = paraCampo(E.paraCentavos(estado.colchao));
     $('#cfg-minimo').value = paraCampo(E.paraCentavos(estado.aporteMinimo));
-    $('#cfg-horizonte').value = String(estado.horizonteMeses);
+    $('#cfg-horizonte').value = String(horizonteValido());
     $('#cfg-conservador').checked = !!estado.conservador;
     $('#cfg-bancario').checked = estado.feriadosBancarios !== false;
     preencherAncora();
