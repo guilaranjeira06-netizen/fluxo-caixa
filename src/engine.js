@@ -394,6 +394,64 @@
     return MESES_CURTOS[mes - 1] + '/' + ano;
   }
 
+  /** '2026-01' -> '2025-12'. */
+  function mesAnteriorDe(chave) {
+    let [ano, mes] = chave.split('-').map(Number);
+    mes -= 1;
+    if (mes === 0) { mes = 12; ano -= 1; }
+    return ano + '-' + doisDigitos(mes);
+  }
+
+  /**
+   * Divide a janela em periodos de competencia.
+   *
+   * O fluxo de caixa e' continuo - o saldo de 30/09 vira o de 01/10 sem nenhum
+   * corte. Mas para dizer "quanto investi em setembro" e' preciso escolher uma
+   * fronteira, e a fronteira que faz sentido para quem vive de salario nao e' o
+   * dia 1: e' o dia em que o dinheiro entra. Setembro comeca quando o salario
+   * de setembro cai.
+   *
+   * `marcos` sao esses dias de virada (as datas de uma regra de entrada, em
+   * geral o salario). O periodo leva o nome do MES do seu marco: o periodo que
+   * abre em 08/09 e' "set/2026", mesmo terminando em 06/10.
+   *
+   * As pontas da janela viram periodos `parcial: true` - o primeiro porque
+   * comecou antes do marco, o ultimo porque o horizonte cortou. Somar dinheiro
+   * de um periodo parcial e comparar com um inteiro daria um grafico mentiroso.
+   */
+  function calcularPeriodos(marcos, diaInicio, diaFim) {
+    const dentro = (marcos || [])
+      .filter((d) => d > diaInicio && d <= diaFim)
+      .sort((a, b) => a - b);
+    const periodos = [];
+
+    function novo(chave, inicio, fim, parcial) {
+      periodos.push({
+        chave, rotulo: rotuloCiclo(chave), inicio, fim, parcial: !!parcial,
+        dias: fim - inicio + 1
+      });
+    }
+
+    if (!dentro.length) {
+      novo(mesDe(diaInicio), diaInicio, diaFim, true);
+      return periodos;
+    }
+    // Sobra da janela antes do primeiro marco: pertence a competencia anterior.
+    novo(mesAnteriorDe(mesDe(dentro[0])), diaInicio, dentro[0] - 1, true);
+    for (let i = 0; i < dentro.length; i++) {
+      const ini = dentro[i];
+      const ultimo = i + 1 >= dentro.length;
+      novo(mesDe(ini), ini, ultimo ? diaFim : dentro[i + 1] - 1, ultimo);
+    }
+    return periodos;
+  }
+
+  /** Em que periodo um dia cai. */
+  function periodoDoDia(periodos, dia) {
+    for (const p of periodos) if (dia >= p.inicio && dia <= p.fim) return p;
+    return null;
+  }
+
   // ------------------------------------------------------------ restricoes
 
   /**
@@ -585,10 +643,17 @@
    *
    * E' guloso-para-o-cedo de proposito: dinheiro parado rende menos, entao a
    * pergunta util e' "qual o maximo hoje", e depois "e no proximo evento".
+   *
+   * Devolve dois conjuntos diferentes, e confundi-los conta dinheiro em dobro:
+   *   linhas    - so' o que o plano esta' PROPONDO agora;
+   *   retiradas - tudo que sai da conta, ja' incluindo `retiradasIniciais`.
+   * Para projetar, use `retiradas` sozinho.
    */
-  function planoDeAportes(ctx, diasCandidatos, minimoCentavos) {
+  function planoDeAportes(ctx, diasCandidatos, minimoCentavos, retiradasIniciais) {
     const minimo = minimoCentavos || 0;
-    const fixas = [];
+    // Transferencias ja feitas (ou ja agendadas) nao sao sugestao: sao dinheiro
+    // que saiu. Entram como ponto de partida, e o plano so' propoe o que sobra.
+    const fixas = (retiradasIniciais || []).slice();
     const linhas = [];
     for (const dia of diasCandidatos) {
       if (dia < ctx.diaInicio || dia > ctx.diaFim) continue;
@@ -609,7 +674,8 @@
     NOMES_DIA_SEMANA,
     domingoDePascoa, feriadosDoAno, criarCalendario,
     dataDaRegraNoMes, expandirRegras, valorNoMes,
-    chaveCiclo, rotuloCiclo, MESES_CURTOS,
+    chaveCiclo, rotuloCiclo, MESES_CURTOS, mesAnteriorDe,
+    calcularPeriodos, periodoDoDia,
     projetar, avaliar,
     criarContexto, projetarComRetiradas, maximoRetiravel, planoDeAportes
   };

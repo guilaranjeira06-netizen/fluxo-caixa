@@ -69,46 +69,55 @@
   // ----------------------------------------------------------------- estado
 
   function estadoExemplo() {
+    var hoje = hojeISO();
+    var r = function (nome, tipo, agenda, ajuste, extra) {
+      return Object.assign({
+        id: idNovo(), nome: nome, tipo: tipo, valor: 0, ativo: true,
+        agenda: agenda, ajuste: ajuste || 'nenhum', valoresPorMes: {}
+      }, extra || {});
+    };
+    // A lista real de lancamentos, com os valores em branco. Melhor comecar com
+    // os nomes certos e zero do que com numeros inventados que parecem prontos.
+    var regras = [
+      r('Salário', 'entrada', { tipo: 'diaUtil', n: 5 }),
+      r('Adiantamento', 'entrada', { tipo: 'diaFixo', dia: 15 }, 'anterior'),
+      r('VR/VA pai', 'entrada', { tipo: 'diaFixo', dia: 5 }, 'anterior'),
+      r('Reembolso', 'entrada', { tipo: 'unica', data: hoje }, 'nenhum', { ativo: false }),
+      r('Cartão de crédito', 'saida', { tipo: 'diaUtil', n: 5 }),
+      r('Construtora', 'saida', { tipo: 'diaFixo', dia: 10 }, 'seguinte'),
+      r('Evolução de obra', 'saida', { tipo: 'diaFixo', dia: 10 }, 'seguinte'),
+      r('Insper', 'saida', { tipo: 'diaFixo', dia: 19 }, 'seguinte'),
+      r('YouTube Premium', 'saida', { tipo: 'diaFixo', dia: 5 }, 'seguinte')
+    ];
     return {
-      versao: 1,
+      versao: 2,
       exemplo: true,
-      saldoInicial: 4200,
-      dataReferencia: hojeISO(),
-      saldoInformadoEm: hojeISO(),
-      limiteNegativo: 2000,
+      saldoInicial: 0,
+      saldoInformadoEm: hoje,
+      dataReferencia: hoje,
+      limiteNegativo: 3300,
       maxDiasNegativos: 10,
       modoFranquia: 'mensal',
       diasJaUsadosNoCiclo: 0,
       diaViradaCiclo: 1,
-      colchao: 300,
+      colchao: 0,
       aporteMinimo: 100,
       conservador: false,
       feriadosBancarios: true,
-      horizonteMeses: 4,
+      horizonteMeses: 3,
       feriadosExtras: [],
-      regras: [
-        { id: idNovo(), nome: 'Salário', tipo: 'entrada', valor: 8500, ativo: true,
-          agenda: { tipo: 'diaUtil', n: 5 }, ajuste: 'nenhum', valoresPorMes: {} },
-        { id: idNovo(), nome: 'Pagamento do dia 15', tipo: 'entrada', valor: 3200, ativo: true,
-          agenda: { tipo: 'diaFixo', dia: 15 }, ajuste: 'anterior', valoresPorMes: {} },
-        { id: idNovo(), nome: 'Cartão de crédito', tipo: 'saida', valor: 4300, ativo: true,
-          agenda: { tipo: 'diaUtil', n: 5 }, ajuste: 'nenhum', valoresPorMes: {} },
-        { id: idNovo(), nome: 'Aluguel', tipo: 'saida', valor: 2600, ativo: true,
-          agenda: { tipo: 'diaFixo', dia: 10 }, ajuste: 'seguinte', valoresPorMes: {} },
-        { id: idNovo(), nome: 'Escola', tipo: 'saida', valor: 1400, ativo: true,
-          agenda: { tipo: 'diaFixo', dia: 10 }, ajuste: 'seguinte', valoresPorMes: {} },
-        { id: idNovo(), nome: 'Financiamento', tipo: 'saida', valor: 1900, ativo: true,
-          agenda: { tipo: 'diaFixo', dia: 19 }, ajuste: 'seguinte', valoresPorMes: {} }
-      ]
+      // O periodo de competencia abre no salario: "meu mes comeca quando entra".
+      ancoraPeriodo: { tipo: 'regra', regraId: regras[0].id },
+      aportes: [],
+      regras: regras
     };
   }
 
   function estadoVazio() {
     var e = estadoExemplo();
     e.exemplo = false;
-    e.saldoInicial = 0;
-    e.colchao = 0;
-    e.regras.forEach(function (r) { r.valor = 0; r.valoresPorMes = {}; });
+    e.regras = [];
+    e.ancoraPeriodo = { tipo: 'diaFixo', dia: 1 };
     return e;
   }
 
@@ -172,6 +181,34 @@
 
     var lancamentos = E.expandirRegras(estado.regras, diaInicio, diaFimCalculo, calendario);
 
+    // ---- periodos de competencia -------------------------------------------
+    // O historico de transferencias comeca antes de hoje, entao os periodos
+    // precisam cobrir tras tambem - senao um aporte de agosto nao teria mes.
+    var aportes = (estado.aportes || []).map(function (a) {
+      return { id: a.id, dia: E.isoParaDia(a.data), iso: a.data,
+               centavos: E.paraCentavos(a.valor), nota: a.nota || '' };
+    }).sort(function (a, b) { return a.dia - b.dia; });
+
+    // Recua ate o mes ANTERIOR ao aporte mais antigo. Comecar a janela em cima
+    // dele deixaria o mes dele sem marco a frente, virando periodo parcial - e
+    // periodo parcial nao entra no grafico, entao a transferencia sumiria.
+    var diaHistorico = diaInicio;
+    if (aportes.length) {
+      var recuo = new Date(Math.min(diaInicio, aportes[0].dia) * E.MS_DIA);
+      recuo.setUTCDate(1);
+      recuo.setUTCMonth(recuo.getUTCMonth() - 1);
+      diaHistorico = Math.min(diaInicio, Math.floor(recuo.getTime() / E.MS_DIA));
+    }
+    var marcos = marcosDoPeriodo(calendario, diaHistorico, diaFimCalculo);
+    var periodos = E.calcularPeriodos(marcos, diaHistorico, diaFimExibicao);
+    var periodoAtual = E.periodoDoDia(periodos, diaInicio);
+
+    // Transferencia ate hoje ja esta refletida no saldo que ele digitou; so' a
+    // agendada para depois ainda precisa sair da projecao.
+    var aportesFuturos = aportes
+      .filter(function (a) { return a.dia > diaInicio && a.centavos > 0; })
+      .map(function (a) { return { dia: a.dia, centavos: a.centavos }; });
+
     // O colchao NAO e' um desconto no fim da conta: ele e' um piso. Somado ao
     // limite da conta vira a unica regra de "ate onde da' para descer", e ai
     // destaque, plano, grafico e extrato falam todos do mesmo numero.
@@ -208,14 +245,14 @@
     candidatos.sort(function (a, b) { return a - b; });
 
     var minimo = E.paraCentavos(estado.aporteMinimo);
-    var plano = E.planoDeAportes(ctx, candidatos, minimo);
+    var plano = E.planoDeAportes(ctx, candidatos, minimo, aportesFuturos);
 
-    var semAportes = E.projetarComRetiradas(ctx, []);
+    var semAportes = E.projetarComRetiradas(ctx, aportesFuturos);
     var comPlano = E.projetarComRetiradas(ctx, plano.retiradas);
     var avaliacaoBase = E.avaliar(semAportes, restricoes);
     var avaliacaoPlano = E.avaliar(comPlano, restricoes);
 
-    var hoje = E.maximoRetiravel(ctx, diaInicio, []);
+    var hoje = E.maximoRetiravel(ctx, diaInicio, aportesFuturos);
 
     // Entra menos do que sai? Entao a "sobra" de hoje e' so' o caixa acabando
     // devagar, e o numero depende do horizonte escolhido. Isso precisa ser dito.
@@ -232,7 +269,22 @@
     }, 0);
     var deficitMensal = liquidoMensal < 0 ? -liquidoMensal : 0;
 
+    // Quanto cada periodo ja recebeu e quanto ainda comporta.
+    periodos.forEach(function (p) {
+      p.realizado = aportes.reduce(function (soma, a) {
+        return soma + (a.dia >= p.inicio && a.dia <= p.fim ? a.centavos : 0);
+      }, 0);
+      p.planejado = plano.linhas.reduce(function (soma, l) {
+        return soma + (l.dia >= p.inicio && l.dia <= p.fim ? l.centavos : 0);
+      }, 0);
+      p.passado = p.fim < diaInicio;
+      p.atual = periodoAtual != null && p.chave === periodoAtual.chave &&
+                p.inicio === periodoAtual.inicio;
+    });
+
     return {
+      periodos: periodos, periodoAtual: periodoAtual, aportes: aportes,
+      noPeriodo: periodoAtual ? periodoAtual.planejado : 0,
       calendario: calendario, ctx: ctx, restricoes: restricoes,
       diaInicio: diaInicio, diaFimExibicao: diaFimExibicao,
       lancamentos: lancamentos, plano: plano,
@@ -244,6 +296,36 @@
     };
   }
 
+  /**
+   * As datas que abrem cada periodo de competencia.
+   *
+   * Ancorar numa REGRA (o salario) e' mais estavel do que "o primeiro
+   * pagamento do mes": um reembolso caindo dia 2 mudaria a fronteira de lugar
+   * todo mes, e o historico deixaria de ser comparavel.
+   */
+  function marcosDoPeriodo(calendario, de, ate) {
+    var ancora = estado.ancoraPeriodo || { tipo: 'diaFixo', dia: 1 };
+    if (ancora.tipo === 'regra') {
+      var regra = (estado.regras || []).find(function (x) { return x.id === ancora.regraId; });
+      if (regra) {
+        return E.expandirRegras([Object.assign({}, regra, { ativo: true })], de, ate, calendario)
+                .map(function (l) { return l.dia; });
+      }
+    }
+    var dia = Math.min(28, Math.max(1, Number(ancora.dia) || 1));
+    var marcos = [];
+    var cursor = new Date(de * E.MS_DIA);
+    cursor.setUTCDate(1);
+    cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+    for (var i = 0; i < 400; i++) {
+      var d = Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), dia) / E.MS_DIA;
+      if (d > ate) break;
+      if (d >= de) marcos.push(d);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+    return marcos;
+  }
+
   // ------------------------------------------------------- render: resposta
 
   function renderResposta(r) {
@@ -253,27 +335,33 @@
     var avisos = $('#avisos');
     avisos.textContent = '';
 
+    var nomeDoMes = r.periodoAtual ? r.periodoAtual.rotulo : 'este mês';
+    $('#rotulo-periodo-topo').textContent = r.periodoAtual
+      ? 'mês de ' + r.periodoAtual.rotulo + ' · ' + comAno(r.periodoAtual.inicio) +
+        ' a ' + comAno(r.periodoAtual.fim)
+      : '';
+
     if (!r.viavel) {
-      rotulo.textContent = 'Pode transferir hoje para investimento';
+      rotulo.textContent = 'Pode transferir em ' + nomeDoMes;
       heroi.textContent = 'R$ 0,00';
       heroi.className = 'heroi ruim';
       nota.textContent = 'A conta não fecha nem sem tirar nada. Veja o alerta acima.';
       avisos.appendChild(avisoDoFuro(r));
     } else {
-      rotulo.textContent = 'Pode transferir hoje para investimento';
-      heroi.textContent = E.formatarBRL(r.sugeridoHoje);
+      // O numero que ele pediu e' o do MES, nao o de hoje: hoje o dinheiro pode
+      // nem estar na conta ainda. O de hoje continua logo abaixo, porque e' ele
+      // que responde "transfiro agora?".
+      rotulo.textContent = 'Pode transferir em ' + nomeDoMes;
+      heroi.textContent = E.formatarBRL(r.noPeriodo);
       heroi.className = 'heroi';
-      var deixar = E.paraCentavos(estado.saldoInicial) - r.sugeridoHoje;
-      nota.innerHTML = 'Deixando <b>' + E.formatarBRL(deixar) + '</b> em conta.' +
-        (r.colchao > 0 ? ' O colchão de ' + E.formatarBRL(r.colchao) + ' já está preservado.' : '') +
-        '<br><br>' + explicarTrava(r);
+      nota.innerHTML = detalharPeriodo(r) + '<br><br>' + explicarTrava(r);
 
       var usoDoVermelho = resumoDoVermelho(r);
       if (usoDoVermelho) {
         avisos.appendChild(montarAviso('atencao', '&#9679;', usoDoVermelho));
-      } else if (r.sugeridoHoje > 0) {
+      } else if (r.noPeriodo > 0) {
         avisos.appendChild(montarAviso('bom', '&#10003;',
-          'Com esse aporte a conta não fica negativa nenhum dia dentro do horizonte.'));
+          'Com esses aportes a conta não fica negativa nenhum dia dentro do horizonte.'));
       }
     }
 
@@ -303,7 +391,12 @@
       return l.centavos < 0 && l.dia >= r.diaInicio;
     })[0];
 
-    fato(fatos, 'Saldo hoje', E.formatarBRL(E.paraCentavos(estado.saldoInicial)));
+    fato(fatos, 'Disponível hoje', E.formatarBRL(r.sugeridoHoje),
+         'saldo em conta: ' + E.formatarBRL(E.paraCentavos(estado.saldoInicial)));
+    if (r.periodoAtual && r.periodoAtual.realizado > 0) {
+      fato(fatos, 'Já transferido em ' + r.periodoAtual.rotulo,
+           E.formatarBRL(r.periodoAtual.realizado));
+    }
     fato(fatos, 'Piso do saldo', E.formatarBRL(r.restricoes.pisoCentavos),
          r.colchao > 0
            ? 'limite ' + E.formatarBRL(r.pisoBruto) + ' + colchão ' + E.formatarBRL(r.colchao)
@@ -321,8 +414,8 @@
       fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso) + ', com o plano');
     }
     var totalPlano = r.plano.linhas.reduce(function (soma, l) { return soma + l.centavos; }, 0);
-    fato(fatos, 'Total do plano', E.formatarBRL(totalPlano),
-         r.plano.linhas.length + ' aporte(s) até ' + comAno(r.diaFimExibicao));
+    fato(fatos, 'Total até ' + comAno(r.diaFimExibicao), E.formatarBRL(totalPlano),
+         r.plano.linhas.length + ' aporte(s) no horizonte inteiro');
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
@@ -418,6 +511,40 @@
            ' &mdash; dentro dos ' + limite + ' que a conta permite. O pior saldo é ' + pior + '.';
   }
 
+  /** Como o total do mes se reparte entre hoje e o que ainda vem. */
+  function detalharPeriodo(r) {
+    var p = r.periodoAtual;
+    if (!p) return '';
+    if (r.noPeriodo <= 0) {
+      var proximo = (r.plano.linhas || []).find(function (l) { return l.dia > p.fim; });
+      if (proximo) {
+        return 'Nada mais neste mês. A próxima janela é <b>' + comAno(proximo.dia) +
+               '</b>, com ' + E.formatarBRL(proximo.centavos) + '.';
+      }
+      return 'Nada sobra neste mês dentro do horizonte projetado.';
+    }
+    var hoje = r.sugeridoHoje;
+    var resto = r.noPeriodo - hoje;
+    var deixarTudo = E.paraCentavos(estado.saldoInicial) - hoje;
+    if (resto <= 0) {
+      // Repetir o mesmo numero duas vezes seguidas so' faz o leitor duvidar.
+      return 'Tudo já disponível hoje. Ficam ' + E.formatarBRL(deixarTudo) + ' em conta' +
+             (r.colchao > 0 ? ', com o colchão de ' + E.formatarBRL(r.colchao) + ' preservado' : '') + '.';
+    }
+    var partes = [];
+    if (hoje > 0) partes.push('<b>' + E.formatarBRL(hoje) + '</b> já disponível hoje');
+    if (resto > 0) {
+      var proxima = (r.plano.linhas || []).find(function (l) {
+        return l.dia > r.diaInicio && l.dia <= p.fim;
+      });
+      partes.push('<b>' + E.formatarBRL(resto) + '</b> a partir de ' +
+                  (proxima ? comAno(proxima.dia) : 'datas mais à frente'));
+    }
+    var deixar = E.paraCentavos(estado.saldoInicial) - hoje;
+    return partes.join(', e ') + '. Hoje ficam ' + E.formatarBRL(deixar) + ' em conta' +
+           (r.colchao > 0 ? ', com o colchão de ' + E.formatarBRL(r.colchao) + ' preservado' : '') + '.';
+  }
+
   function fato(pai, chave, valor, sub) {
     var v = criar('span', { class: 'v' });
     v.appendChild(document.createTextNode(valor));
@@ -464,6 +591,176 @@
     return montarAviso('critico', '&#9888;', texto);
   }
 
+  // ------------------------------------------------------- render: aportes
+
+  /**
+   * Barras de quanto foi para investimento em cada mes de competencia.
+   *
+   * Duas faixas empilhadas por barra: o que ja saiu da conta (azul) e o que
+   * ainda cabe segundo o plano (laranja). Somadas dao a capacidade do mes.
+   * Periodos parciais - as pontas da janela - ficam de fora: meio mes ao lado
+   * de um mes inteiro faria o grafico mentir.
+   */
+  function renderAportes(r) {
+    var periodos = (r.periodos || []).filter(function (p) {
+      return !p.parcial && (p.realizado > 0 || p.planejado > 0);
+    }).slice(-12);
+
+    var temAlgum = (r.aportes || []).length > 0;
+    $('#aportes-vazio').classList.toggle('oculto', temAlgum);
+    $('#dobra-lista-aportes').classList.toggle('oculto', !temAlgum);
+    $('#grafico-aportes').classList.toggle('oculto', periodos.length === 0);
+    $('#legenda-aportes').classList.toggle('oculto', periodos.length === 0);
+
+    var totalFeito = (r.aportes || []).reduce(function (x, a) { return x + a.centavos; }, 0);
+    $('#sub-aportes').innerHTML = temAlgum
+      ? 'Já foram <b>' + E.formatarBRL(totalFeito) + '</b> em ' + r.aportes.length +
+        ' transferência(s). As barras claras são o que o plano ainda comporta.'
+      : 'O que você de fato mandou para a conta investimento, mês a mês.';
+
+    renderBarras(periodos, r);
+    renderListaAportes(r);
+  }
+
+  var BL = 74, BR = 16, BT = 26, BB = 34, BW = 920, BH = 300;
+  var estadoBarras = null;
+  var barrasLigadas = false;
+
+  function renderBarras(periodos, r) {
+    var svg = $('#grafico-aportes');
+    svg.setAttribute('viewBox', '0 0 ' + BW + ' ' + BH);
+    svg.textContent = '';
+    if (!periodos.length) { estadoBarras = null; return; }
+
+    var ns = 'http://www.w3.org/2000/svg';
+    function el(nome, attrs) {
+      var n = document.createElementNS(ns, nome);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      return n;
+    }
+    function texto(conteudo, attrs) {
+      var n = el('text', attrs); n.textContent = conteudo; return n;
+    }
+
+    var topo = Math.max.apply(null, periodos.map(function (p) { return p.realizado + p.planejado; }));
+    if (topo <= 0) topo = 100;
+    var max = topo * 1.15;
+    var y = function (v) { return BT + (1 - v / max) * (BH - BT - BB); };
+    var faixa = (BW - BL - BR) / periodos.length;
+    var largura = Math.min(64, faixa * 0.62);
+
+    var passo = passoBonito(max / 4);
+    for (var v = 0; v <= max; v += passo) {
+      svg.appendChild(el('line', {
+        x1: BL, x2: BW - BR, y1: y(v), y2: y(v),
+        stroke: v === 0 ? 'var(--eixo)' : 'var(--grade)', 'stroke-width': v === 0 ? 1.5 : 1
+      }));
+      svg.appendChild(texto(formatarCurto(v), {
+        x: BL - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--tinta-3)'
+      }));
+    }
+
+    var temPlanejado = periodos.some(function (p) { return p.planejado > 0; });
+    $('#chave-ainda').classList.toggle('oculto', !temPlanejado);
+
+    periodos.forEach(function (p, i) {
+      var cx = BL + faixa * (i + 0.5);
+      var x = cx - largura / 2;
+      var g = el('g', { class: 'coluna' });
+
+      if (p.realizado > 0) {
+        g.appendChild(el('rect', {
+          class: 'barra', x: x, y: y(p.realizado), width: largura,
+          height: Math.max(2, y(0) - y(p.realizado)), rx: 4, fill: 'var(--serie-1)'
+        }));
+      }
+      if (p.planejado > 0) {
+        // 2px de respiro entre as faixas: sem isso as duas cores se encostam e
+        // a fronteira some.
+        var base = p.realizado > 0 ? y(p.realizado) - 2 : y(0);
+        var alturaTopo = Math.max(2, base - y(p.realizado + p.planejado));
+        g.appendChild(el('rect', {
+          class: 'barra', x: x, y: base - alturaTopo, width: largura,
+          height: alturaTopo, rx: 4, fill: 'var(--serie-2)'
+        }));
+      }
+      var total = p.realizado + p.planejado;
+      if (total > 0) {
+        g.appendChild(texto(formatarCurto(total), {
+          x: cx, y: y(total) - 7, 'text-anchor': 'middle', 'font-size': 11,
+          fill: 'var(--tinta-2)'
+        }));
+      }
+      g.appendChild(texto(p.rotulo.split('/')[0], {
+        x: cx, y: BH - BB + 16, 'text-anchor': 'middle', 'font-size': 11,
+        fill: p.atual ? 'var(--tinta)' : 'var(--tinta-3)',
+        'font-weight': p.atual ? 620 : 400
+      }));
+      svg.appendChild(g);
+    });
+
+    montarInteracaoBarras(svg, periodos, BL, faixa);
+  }
+
+  function montarInteracaoBarras(svg, periodos, esquerda, faixa) {
+    estadoBarras = { periodos: periodos, esquerda: esquerda, faixa: faixa };
+    if (barrasLigadas) return;
+    barrasLigadas = true;
+
+    function mover(ev) {
+      var g = estadoBarras;
+      if (!g) return;
+      var alvo = $('#grafico-aportes');
+      var caixa = alvo.getBoundingClientRect();
+      if (!caixa.width) return;
+      var toque = ev.touches && ev.touches[0];
+      var cx = ((toque ? toque.clientX : ev.clientX) - caixa.left) * (BW / caixa.width);
+      var i = Math.floor((cx - g.esquerda) / g.faixa);
+      var dica = $('#dica-aportes');
+      if (i < 0 || i >= g.periodos.length) { dica.classList.remove('visivel'); return; }
+      var p = g.periodos[i];
+      dica.innerHTML =
+        '<div class="titulo">' + p.rotulo + '</div>' +
+        '<div class="par"><span>transferido</span><span class="v">' + E.formatarBRL(p.realizado) + '</span></div>' +
+        (p.planejado > 0
+          ? '<div class="par"><span>ainda cabe</span><span class="v">' + E.formatarBRL(p.planejado) + '</span></div>'
+          : '') +
+        '<div class="ev">' + comAno(p.inicio) + ' a ' + comAno(p.fim) + '</div>';
+      dica.classList.add('visivel');
+      var meio = (g.esquerda + g.faixa * (i + 0.5)) / BW * caixa.width;
+      dica.style.left = Math.max(90, Math.min(caixa.width - 90, meio)) + 'px';
+      dica.style.top = (BT / BH) * caixa.height + 'px';
+    }
+    function sair() { $('#dica-aportes').classList.remove('visivel'); }
+
+    svg.addEventListener('mousemove', mover);
+    svg.addEventListener('mouseleave', sair);
+    svg.addEventListener('touchstart', mover, { passive: true });
+    svg.addEventListener('touchmove', mover, { passive: true });
+    svg.addEventListener('touchend', sair);
+  }
+
+  function renderListaAportes(r) {
+    var corpo = $('#tabela-aportes').querySelector('tbody');
+    corpo.textContent = '';
+    (r.aportes || []).slice().reverse().forEach(function (a) {
+      var periodo = E.periodoDoDia(r.periodos, a.dia);
+      corpo.appendChild(criar('tr', {}, [
+        criar('td', { text: comAno(a.dia) }),
+        criar('td', { text: periodo ? periodo.rotulo : '—' }),
+        criar('td', { text: a.nota || '' }),
+        criar('td', { class: 'num', text: E.formatarBRL(a.centavos) }),
+        criar('td', {}, [criar('button', {
+          class: 'discreto perigo', title: 'Remover', text: '×',
+          onclick: function () {
+            estado.aportes = (estado.aportes || []).filter(function (x) { return x.id !== a.id; });
+            aplicar();
+          }
+        })])
+      ]));
+    });
+  }
+
   // ---------------------------------------------------------- render: plano
 
   function renderPlano(r) {
@@ -486,9 +783,11 @@
       }
       var valor = l.centavos;
       acumulado += valor;
+      var periodo = E.periodoDoDia(r.periodos, l.dia);
       corpo.appendChild(criar('tr', { class: l.dia === r.diaInicio ? 'hoje' : '' }, [
         criar('td', { text: comAno(l.dia) }),
         criar('td', { text: textoDiaSemana(l.dia) }),
+        criar('td', { text: periodo ? periodo.rotulo : '—' }),
         criar('td', { text: motivo }),
         criar('td', { class: 'num', text: E.formatarBRL(valor) }),
         criar('td', { class: 'num', text: E.formatarBRL(acumulado) })
@@ -950,9 +1249,43 @@
     $('#cfg-horizonte').value = String(estado.horizonteMeses);
     $('#cfg-conservador').checked = !!estado.conservador;
     $('#cfg-bancario').checked = estado.feriadosBancarios !== false;
+    preencherAncora();
     $('#cfg-feriados').value = (estado.feriadosExtras || []).map(function (f) {
       return typeof f === 'string' ? f : (f.data + ' ' + (f.nome || ''));
     }).join('\n').trim();
+  }
+
+  /**
+   * Liga um evento sem deixar que um seletor errado derrube o app inteiro.
+   * Um botao que sumiu do HTML custava, antes, a tela toda em branco.
+   */
+  function ao(seletor, evento, fn) {
+    var el = $(seletor);
+    if (!el) {
+      if (window.console) console.warn('fluxo-caixa: elemento ausente ' + seletor);
+      return;
+    }
+    el.addEventListener(evento, fn);
+  }
+
+  /** As opcoes de inicio de periodo saem das proprias regras de entrada. */
+  function preencherAncora() {
+    var sel = $('#cfg-ancora');
+    sel.textContent = '';
+    var ancora = estado.ancoraPeriodo || { tipo: 'diaFixo', dia: 1 };
+    (estado.regras || [])
+      .filter(function (x) { return x.tipo === 'entrada' && (x.agenda || {}).tipo !== 'unica'; })
+      .forEach(function (x) {
+        var op = criar('option', { value: x.id, text: x.nome || 'Entrada' });
+        if (ancora.tipo === 'regra' && ancora.regraId === x.id) op.selected = true;
+        sel.appendChild(op);
+      });
+    [1, 5, 10, 15, 20, 25].forEach(function (d) {
+      var op = criar('option', { value: 'dia:' + d, text: 'todo dia ' + d });
+      if (ancora.tipo === 'diaFixo' && Number(ancora.dia) === d) op.selected = true;
+      sel.appendChild(op);
+    });
+    if (!sel.value && sel.options.length) sel.options[0].selected = true;
   }
 
   function ligarConfig() {
@@ -967,7 +1300,7 @@
     }
     dinheiro('#cfg-saldo', 'saldoInicial');
     // Saber QUANDO o saldo foi digitado e' o que permite avisar que ele envelheceu.
-    $('#cfg-saldo').addEventListener('change', function () {
+    ao('#cfg-saldo', 'change', function () {
       estado.saldoInformadoEm = estado.dataReferencia;
       dataFoiAvancada = false;
       aplicar();
@@ -976,55 +1309,67 @@
     dinheiro('#cfg-colchao', 'colchao');
     dinheiro('#cfg-minimo', 'aporteMinimo');
 
-    $('#cfg-data').addEventListener('change', function () {
+    ao('#cfg-data', 'change', function () {
       estado.dataReferencia = $('#cfg-data').value || hojeISO(); aplicar();
     });
-    $('#cfg-dias').addEventListener('change', function () {
+    ao('#cfg-dias', 'change', function () {
       estado.maxDiasNegativos = Math.max(0, Number($('#cfg-dias').value) || 0); aplicar();
     });
-    $('#cfg-modo-franquia').addEventListener('change', function () {
+    ao('#cfg-modo-franquia', 'change', function () {
       estado.modoFranquia = $('#cfg-modo-franquia').value; aplicar();
     });
-    $('#cfg-dias-usados').addEventListener('change', function () {
+    ao('#cfg-dias-usados', 'change', function () {
       estado.diasJaUsadosNoCiclo = Math.max(0, Number($('#cfg-dias-usados').value) || 0); aplicar();
     });
-    $('#cfg-virada').addEventListener('change', function () {
+    ao('#cfg-virada', 'change', function () {
       estado.diaViradaCiclo = Math.min(28, Math.max(1, Number($('#cfg-virada').value) || 1)); aplicar();
     });
-    $('#cfg-horizonte').addEventListener('change', function () {
+    ao('#cfg-horizonte', 'change', function () {
       estado.horizonteMeses = Number($('#cfg-horizonte').value); aplicar();
     });
-    $('#cfg-conservador').addEventListener('change', function () {
+    ao('#cfg-conservador', 'change', function () {
       estado.conservador = $('#cfg-conservador').checked; aplicar();
     });
-    $('#cfg-bancario').addEventListener('change', function () {
+    ao('#cfg-bancario', 'change', function () {
       estado.feriadosBancarios = $('#cfg-bancario').checked; aplicar();
     });
-    $('#cfg-feriados').addEventListener('change', function () {
+    ao('#cfg-feriados', 'change', function () {
       estado.feriadosExtras = $('#cfg-feriados').value.split('\n').map(function (linha) {
         var m = linha.trim().match(/^(\d{4}-\d{2}-\d{2})\s*(.*)$/);
         return m ? { data: m[1], nome: m[2] || 'Feriado local' } : null;
       }).filter(Boolean);
       aplicar();
     });
-    $('#chk-todos-dias').addEventListener('change', aplicar);
+    ao('#chk-todos-dias', 'change', aplicar);
 
-    $('#btn-nova-entrada').addEventListener('click', function () { novaRegra('entrada'); });
-    $('#btn-nova-avulso').addEventListener('click', function () { novaRegra('entrada', 'unica'); });
-    $('#btn-nova-saida').addEventListener('click', function () { novaRegra('saida'); });
-    $('#btn-limpar-exemplo').addEventListener('click', function () {
-      estado = estadoVazio(); aplicar(true);
+    ao('#btn-nova-entrada', 'click', function () { novaRegra('entrada'); });
+    ao('#btn-nova-avulso', 'click', function () { novaRegra('entrada', 'unica'); });
+    ao('#btn-nova-saida', 'click', function () { novaRegra('saida'); });
+    ao('#btn-exemplo', 'click', function () {
+      if (confirm('Substituir os lançamentos atuais pela lista padrão?')) { estado = estadoExemplo(); aplicar(true); }
     });
-    $('#btn-exemplo').addEventListener('click', function () {
-      if (confirm('Substituir os dados atuais pelo exemplo?')) { estado = estadoExemplo(); aplicar(true); }
-    });
-    $('#btn-zerar').addEventListener('click', function () {
+    ao('#btn-zerar', 'click', function () {
       if (confirm('Apagar todos os lançamentos e começar do zero?')) { estado = estadoVazio(); aplicar(true); }
     });
-    $('#btn-exportar').addEventListener('click', exportar);
-    $('#btn-importar').addEventListener('click', function () { $('#arquivo-importar').click(); });
-    $('#arquivo-importar').addEventListener('change', importar);
-    $('#btn-tema').addEventListener('click', alternarTema);
+    ao('#btn-registrar', 'click', function () { abrirRegistro(ultimoResultado); });
+    ao('#reg-cancelar', 'click', fecharRegistro);
+    ao('#reg-data', 'change', ajustarDesconto);
+    ao('#reg-salvar', 'click', salvarRegistro);
+    ao('#reg-valor', 'keydown', function (ev) {
+      if (ev.key === 'Enter') salvarRegistro();
+    });
+    ao('#cfg-ancora', 'change', function () {
+      var v = $('#cfg-ancora').value;
+      estado.ancoraPeriodo = v.indexOf('dia:') === 0
+        ? { tipo: 'diaFixo', dia: Number(v.slice(4)) }
+        : { tipo: 'regra', regraId: v };
+      aplicar();
+    });
+    ao('#btn-nova-saida-avulsa', 'click', function () { novaRegra('saida', 'unica'); });
+    ao('#btn-exportar', 'click', exportar);
+    ao('#btn-importar', 'click', function () { $('#arquivo-importar').click(); });
+    ao('#arquivo-importar', 'change', importar);
+    ao('#btn-tema', 'click', alternarTema);
   }
 
   function novaRegra(tipo, forma) {
@@ -1038,6 +1383,62 @@
       valoresPorMes: {}
     });
     estado.exemplo = false;
+    aplicar(true);
+  }
+
+  // ------------------------------------------------- registrar transferencia
+
+  function abrirRegistro(r) {
+    $('#reg-data').value = estado.dataReferencia || hojeISO();
+    $('#reg-valor').value = paraCampo(r ? r.sugeridoHoje : 0);
+    $('#reg-nota').value = '';
+    ajustarDesconto();
+    $('#form-registro').classList.remove('oculto');
+    $('#btn-registrar').classList.add('oculto');
+    $('#reg-valor').focus();
+    $('#reg-valor').select();
+  }
+
+  /**
+   * O desconto so' vem marcado quando a transferencia e' de hoje. Lancamento
+   * retroativo e' registro de historico: o saldo atual ja o reflete.
+   */
+  function ajustarDesconto() {
+    var iso = $('#reg-data').value || estado.dataReferencia || hojeISO();
+    var ehHoje = iso === (estado.dataReferencia || hojeISO());
+    $('#reg-descontar').checked = ehHoje;
+    $('#reg-descontar-texto').textContent = ehHoje
+      ? 'Descontar do saldo em conta (transferência de hoje)'
+      : 'Descontar do saldo em conta — só marque se o saldo ainda não reflete';
+  }
+
+  function fecharRegistro() {
+    $('#form-registro').classList.add('oculto');
+    $('#btn-registrar').classList.remove('oculto');
+  }
+
+  function salvarRegistro() {
+    var centavos = E.paraCentavos($('#reg-valor').value);
+    if (centavos <= 0) {
+      $('#reg-valor').focus();
+      return;
+    }
+    estado.aportes = (estado.aportes || []).concat([{
+      id: idNovo(),
+      data: $('#reg-data').value || estado.dataReferencia || hojeISO(),
+      valor: E.paraReais(centavos),
+      nota: $('#reg-nota').value.trim()
+    }]);
+    // Descontar do saldo e' escolha explicita, nunca automatica: registrar uma
+    // transferencia ANTIGA nao pode tirar o dinheiro de novo - o saldo que ele
+    // digitou hoje ja a contem. So' a de hoje e' que costuma faltar descontar.
+    if ($('#reg-descontar').checked) {
+      var novoSaldo = E.paraCentavos(estado.saldoInicial) - centavos;
+      estado.saldoInicial = E.paraReais(Math.max(0, novoSaldo));
+      estado.saldoInformadoEm = estado.dataReferencia;
+    }
+    estado.exemplo = false;
+    fecharRegistro();
     aplicar(true);
   }
 
@@ -1081,10 +1482,14 @@
 
   // ------------------------------------------------------------- orquestra
 
+  var ultimoResultado = null;
+
   function aplicar(redesenharCampos) {
     salvar();
     var r = calcular();
+    ultimoResultado = r;
     renderResposta(r);
+    renderAportes(r);
     renderPlano(r);
     renderGrafico(r);
     renderExtrato(r);

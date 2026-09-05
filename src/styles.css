@@ -216,3 +216,17 @@ details.dobra > summary:hover { color: var(--tinta); }
   .cabecalho-secao .espaco { flex-basis: 100%; }
   .cabecalho-secao button { flex: 1 1 auto; }
 }
+
+/* Registro de transferencia: some ate ser pedido. */
+.caixa-registro {
+  margin-top: 12px; padding: 13px; border: 1px solid var(--eixo);
+  border-radius: 8px; background: var(--plano);
+}
+.caixa-registro .grade-campos { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+
+/* Barras do grafico mensal. */
+svg.grafico rect.barra { transition: opacity .1s; }
+svg.grafico g.coluna:hover rect.barra { opacity: .82; }
+
+/* Legenda de grafico de barras: amostra quadrada, nao risco de linha. */
+.legenda.barras i { width: 11px; height: 11px; border-radius: 3px; }

@@ -51,7 +51,26 @@ recebimentos avulsos que forem confirmando. A data de referência anda sozinha
 para o dia de hoje quando você abre o app, e ele avisa quando o saldo em conta
 foi informado numa data anterior — número velho é pior que número nenhum.
 
-### 2. Projeção diária
+### 2. Período de competência
+
+O fluxo de caixa é contínuo — o saldo de 30/09 vira o de 01/10 sem corte
+nenhum. Mas para responder "quanto investi em setembro" é preciso escolher uma
+fronteira, e para quem vive de salário essa fronteira não é o dia 1: **o mês
+começa quando o dinheiro entra.**
+
+Então o período é ancorado numa **regra de entrada** (o salário, por padrão), e
+leva o nome do mês do seu marco: o período que abre em 08/09 é "set/2026",
+mesmo terminando em 06/10. Ancorar numa regra é mais estável do que "o primeiro
+pagamento do mês" — um reembolso caindo dia 2 mudaria a fronteira de lugar todo
+mês e o histórico deixaria de ser comparável.
+
+Os períodos das pontas da janela ficam marcados como parciais e **não entram no
+gráfico**: meio mês ao lado de um mês inteiro faria a comparação mentir.
+
+Isso é só agrupamento para o relatório. Não muda o cálculo em nada — o solver
+continua olhando a linha contínua do saldo.
+
+### 3. Projeção diária
 
 Saldo inicial mais os lançamentos, dia a dia. Tudo em **centavos inteiros**: em
 dinheiro, um centavo de erro de arredondamento muda a resposta de "pode" para
@@ -86,7 +105,7 @@ app avisa em quanto está o rombo mensal, para o número não parecer arbitrári
 **Na prática: 3 ou 4 meses.** Aumente só para conferir o efeito de uma despesa
 grande lá na frente (IPVA, seguro, viagem).
 
-### 3. As restrições da conta
+### 4. As restrições da conta
 
 Duas, e são elas que fazem a ferramenta valer:
 
@@ -119,7 +138,7 @@ Exemplo: conta de R$ 1.000 vence amanhã, entram R$ 2.000 daqui a cinco dias, e
 você tem R$ 1.000 em caixa. Dá para investir os R$ 1.000 inteiros e ficar
 R$ 1.000 negativo por quatro dias, gastando 4 da franquia de 10 do mês.
 
-### 4. O solver
+### 5. O solver
 
 Para uma data, "quanto dá para tirar" sai por **busca binária sobre centavos
 inteiros**. Funciona porque tirar mais nunca melhora a situação: a curva de
@@ -135,7 +154,23 @@ O teto tem dois lados, e vale o menor:
 - **o piso** — passar dele fura o limite já no dia da retirada.
 
 O **plano de aportes** repete isso em cada data candidata (hoje e todo dia em
-que entra dinheiro), na ordem, descontando o que já foi retirado antes. Tirar
+que entra dinheiro), na ordem, descontando o que já foi retirado antes — e
+parte das transferências que você já registrou, que não são sugestão e sim
+dinheiro que saiu.
+
+### 6. O que você de fato transferiu
+
+Projeção é uma coisa; histórico é outra. **Registrar transferência** grava o que
+você realmente mandou para a conta investimento, com data e observação. Esses
+lançamentos:
+
+- alimentam o gráfico **Transferido por mês**, agrupado pelo período de
+  competência — barra escura é o que já saiu, barra clara é o que o plano ainda
+  comporta naquele mês;
+- entram no plano como dinheiro já comprometido, para não serem sugeridos de novo;
+- só descontam do saldo em conta se você marcar. Registrar uma transferência
+  antiga é anotar histórico — o saldo de hoje já a reflete, e descontar de novo
+  tiraria o mesmo dinheiro duas vezes. Tirar
 mais cedo é o objetivo — dinheiro parado não rende —, e cada linha já conta com
 as anteriores.
 
@@ -147,7 +182,7 @@ dia, quanto falta e qual restrição quebrou.
 ## Uso
 
 ```
-node --test test/     # 36 testes do motor de cálculo
+node --test test/     # 42 testes do motor de cálculo
 node build.js         # gera dist/fluxo-caixa.html, arquivo único
 ```
 

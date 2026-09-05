@@ -23,16 +23,15 @@
 
   <div class="topo">
     <h1>Fluxo de caixa</h1>
-    <span class="legenda-topo">quanto d&aacute; para investir sem furar a conta</span>
+    <span class="legenda-topo" id="rotulo-periodo-topo"></span>
     <span class="espaco"></span>
     <button id="btn-tema" class="discreto" title="Alternar tema">Tema</button>
   </div>
 
   <div id="banner-exemplo" class="aviso atencao oculto">
     <span class="icone" aria-hidden="true">&#9679;</span>
-    <p><b>Aten&ccedil;&atilde;o: estes s&atilde;o valores de exemplo.</b> Troque pelos seus n&uacute;meros reais nos campos abaixo &mdash;
-       o c&aacute;lculo s&oacute; vale quando os lan&ccedil;amentos forem os seus.
-       <button id="btn-limpar-exemplo" class="discreto">Zerar os valores de exemplo</button></p>
+    <p><b>Preencha os valores.</b> A lista de lan&ccedil;amentos j&aacute; est&aacute; montada com os seus itens
+       &mdash; falta informar quanto &eacute; cada um, l&aacute; embaixo.</p>
   </div>
 
   <!-- ====================================================== A RESPOSTA -->
@@ -40,27 +39,71 @@
     <div id="avisos"></div>
     <div class="resposta">
       <div>
-        <div class="rotulo-heroi" id="rotulo-heroi">Pode transferir hoje para investimento</div>
+        <div class="rotulo-heroi" id="rotulo-heroi">Pode transferir para investimento</div>
         <div class="heroi" id="valor-heroi">&mdash;</div>
         <div class="heroi-nota" id="nota-heroi"></div>
+        <div class="barra-botoes">
+          <button id="btn-registrar" class="principal">Registrar transfer&ecirc;ncia</button>
+        </div>
+        <div id="form-registro" class="oculto caixa-registro">
+          <div class="grade-campos">
+            <label class="campo">Data
+              <input type="date" id="reg-data">
+            </label>
+            <label class="campo">Valor transferido
+              <input type="text" id="reg-valor" inputmode="decimal" placeholder="0,00">
+            </label>
+            <label class="campo">Observa&ccedil;&atilde;o
+              <input type="text" id="reg-nota" placeholder="opcional">
+            </label>
+          </div>
+          <label class="linha-check" style="margin-top:8px">
+            <input type="checkbox" id="reg-descontar">
+            <span id="reg-descontar-texto">Descontar do saldo em conta</span>
+          </label>
+          <div class="barra-botoes">
+            <button id="reg-salvar" class="principal">Salvar</button>
+            <button id="reg-cancelar" class="discreto">Cancelar</button>
+          </div>
+        </div>
       </div>
       <div class="fatos" id="fatos"></div>
     </div>
   </section>
 
+  <!-- ================================================ APORTES POR PERIODO -->
+  <section class="cartao">
+    <div class="cabecalho-secao"><h2>Transferido por m&ecirc;s</h2></div>
+    <p class="subtitulo" id="sub-aportes"></p>
+    <div class="legenda barras" id="legenda-aportes">
+      <span class="chave"><i style="background: var(--serie-1)"></i> J&aacute; transferido</span>
+      <span class="chave" id="chave-ainda"><i style="background: var(--serie-2)"></i> Ainda cabe</span>
+    </div>
+    <div class="moldura-grafico">
+      <svg class="grafico" id="grafico-aportes" role="img" aria-label="Transferido para investimento por m&ecirc;s"></svg>
+      <div class="dica-flutuante" id="dica-aportes" aria-hidden="true"></div>
+    </div>
+    <div id="aportes-vazio" class="vazio oculto">
+      Nenhuma transfer&ecirc;ncia registrada ainda. Toque em <b>Registrar transfer&ecirc;ncia</b> quando fizer a primeira.
+    </div>
+    <details class="dobra" id="dobra-lista-aportes">
+      <summary>Transfer&ecirc;ncias registradas</summary>
+      <div class="rolagem"><table id="tabela-aportes">
+        <thead><tr><th>Data</th><th>M&ecirc;s</th><th>Observa&ccedil;&atilde;o</th><th class="num">Valor</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </details>
+  </section>
+
   <!-- ================================================== PLANO DE APORTES -->
   <section class="cartao">
-    <div class="cabecalho-secao">
-      <h2>Plano de aportes</h2>
-      <span class="espaco"></span>
-    </div>
+    <div class="cabecalho-secao"><h2>Quando d&aacute; para transferir</h2></div>
     <p class="subtitulo">
-      O m&aacute;ximo que d&aacute; para tirar em cada data, <b>na ordem</b>: cada linha j&aacute; conta que voc&ecirc; tirou
-      as anteriores. Tirar menos hoje sobra mais l&aacute; na frente.
+      O m&aacute;ximo em cada data, <b>na ordem</b>: cada linha j&aacute; conta que voc&ecirc; tirou as anteriores.
     </p>
     <div class="rolagem"><table id="tabela-plano">
       <thead><tr>
-        <th>Data</th><th>Dia</th><th>Por que essa data</th>
+        <th>Data</th><th>Dia</th><th>M&ecirc;s</th><th>Por que essa data</th>
         <th class="num">Pode tirar</th><th class="num">Acumulado</th>
       </tr></thead>
       <tbody></tbody>
@@ -68,90 +111,17 @@
     <div id="plano-vazio" class="vazio oculto">Nada sobra para investir dentro do horizonte projetado.</div>
   </section>
 
-  <!-- =========================================================== GRAFICO -->
-  <section class="cartao">
-    <div class="cabecalho-secao"><h2>Saldo projetado</h2></div>
-    <div class="legenda">
-      <span class="chave"><i style="background: var(--serie-1)"></i> Sem tirar nada</span>
-      <span class="chave" id="chave-com-plano"><i style="background: var(--serie-2)"></i> Depois do plano de aportes</span>
-      <span class="chave" style="color: var(--critico)"><i class="tracejado"></i> Limite negativo</span>
-    </div>
-    <div class="moldura-grafico">
-      <svg class="grafico" id="grafico" role="img" aria-label="Saldo di&aacute;rio projetado"></svg>
-      <div class="dica-flutuante" id="dica-grafico" aria-hidden="true"></div>
-    </div>
-  </section>
-
-  <!-- ====================================================== CONFIGURACAO -->
-  <section class="cartao">
-    <div class="cabecalho-secao"><h2>Sua conta</h2></div>
-    <div class="grade-campos">
-      <label class="campo">Saldo hoje
-        <input type="text" id="cfg-saldo" inputmode="decimal" placeholder="0,00">
-        <span class="dica">o que est&aacute; na conta corrente agora</span>
-      </label>
-      <label class="campo">Data de refer&ecirc;ncia
-        <input type="date" id="cfg-data">
-      </label>
-      <label class="campo">Limite negativo permitido
-        <input type="text" id="cfg-limite" inputmode="decimal" placeholder="2.000,00">
-        <span class="dica">quanto a conta deixa ficar no vermelho</span>
-      </label>
-      <label class="campo">Dias no vermelho sem juros
-        <input type="number" id="cfg-dias" min="0" max="60" step="1">
-        <span class="dica">a franquia que o banco d&aacute;</span>
-      </label>
-      <label class="campo">Como o banco conta
-        <select id="cfg-modo-franquia">
-          <option value="mensal">Somados no ciclo</option>
-          <option value="corridos">Corridos seguidos</option>
-        </select>
-        <span class="dica">&quot;10 dias esse m&ecirc;s&quot; = somados</span>
-      </label>
-      <label class="campo">Dias j&aacute; usados no ciclo
-        <input type="number" id="cfg-dias-usados" min="0" max="60" step="1">
-        <span class="dica">o &quot;total de dias em uso&quot; do app do banco</span>
-      </label>
-      <label class="campo">Dia da virada do ciclo
-        <input type="number" id="cfg-virada" min="1" max="28" step="1">
-        <span class="dica">quando o contador zera; 1 = m&ecirc;s calend&aacute;rio</span>
-      </label>
-      <label class="campo">Colch&atilde;o de seguran&ccedil;a
-        <input type="text" id="cfg-colchao" inputmode="decimal" placeholder="0,00">
-        <span class="dica">folga que nunca &eacute; usada: sobe o piso do saldo</span>
-      </label>
-      <label class="campo">Aporte m&iacute;nimo
-        <input type="text" id="cfg-minimo" inputmode="decimal" placeholder="100,00">
-        <span class="dica">n&atilde;o sugerir troco</span>
-      </label>
-      <label class="campo">Horizonte
-        <span class="dica">at&eacute; onde a proje&ccedil;&atilde;o enxerga</span>
-        <select id="cfg-horizonte">
-          <option value="2">2 meses</option>
-          <option value="3">3 meses</option>
-          <option value="4">4 meses</option>
-          <option value="6">6 meses</option>
-          <option value="12">12 meses</option>
-        </select>
-      </label>
-    </div>
-    <div class="barra-botoes">
-      <label class="linha-check"><input type="checkbox" id="cfg-conservador"> Modo conservador (nunca ficar negativo)</label>
-      <label class="linha-check"><input type="checkbox" id="cfg-bancario"> Bancos fechados em 24 e 31/12</label>
-    </div>
-  </section>
-
   <!-- ============================================================ REGRAS -->
   <section class="cartao">
     <div class="cabecalho-secao">
       <h2>Entradas</h2><span class="espaco"></span>
-      <button id="btn-nova-avulso">+ Recebimento avulso</button>
-      <button id="btn-nova-entrada">+ Entrada recorrente</button>
+      <button id="btn-nova-avulso">+ Avulsa</button>
+      <button id="btn-nova-entrada">+ Recorrente</button>
     </div>
     <p class="subtitulo">
       Cadastre uma vez e pronto: cada regra se repete sozinha todos os meses.
       Para um m&ecirc;s fora do padr&atilde;o &mdash; a fatura do cart&atilde;o, o 13&ordm; &mdash; abra
-      <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha e informe s&oacute; aquele m&ecirc;s.
+      <b>vig&ecirc;ncia e valores m&ecirc;s a m&ecirc;s</b> na pr&oacute;pria linha.
     </p>
     <div class="regras" id="lista-entradas"></div>
     <div id="entradas-vazio" class="vazio oculto">Nenhuma entrada cadastrada.</div>
@@ -160,31 +130,118 @@
   <section class="cartao">
     <div class="cabecalho-secao">
       <h2>Sa&iacute;das</h2><span class="espaco"></span>
-      <button id="btn-nova-saida">+ Sa&iacute;da</button>
+      <button id="btn-nova-saida-avulsa">+ Avulsa</button>
+      <button id="btn-nova-saida">+ Recorrente</button>
     </div>
     <div class="regras" id="lista-saidas"></div>
     <div id="saidas-vazio" class="vazio oculto">Nenhuma sa&iacute;da cadastrada.</div>
   </section>
 
-  <!-- ========================================================== CALENDARIO -->
+  <!-- ====================================================== CONFIGURACAO -->
   <section class="cartao">
-    <div class="cabecalho-secao"><h2>Extrato projetado</h2></div>
-    <p class="subtitulo">
-      Somente os dias com movimento e os dias em que o saldo fica negativo.
-      <label class="linha-check" style="display:inline-flex; margin-left:10px">
-        <input type="checkbox" id="chk-todos-dias"> mostrar todos os dias
-      </label>
-    </p>
-    <div class="rolagem"><table id="tabela-extrato">
-      <thead><tr>
-        <th>Data</th><th>Dia</th><th>Lan&ccedil;amentos</th>
-        <th class="num">Entra</th><th class="num">Sai</th><th class="num">Aporte</th><th class="num">Saldo</th><th>Vermelho</th>
-      </tr></thead>
-      <tbody></tbody>
-    </table></div>
+    <details class="dobra" id="dobra-conta">
+      <summary>Sua conta &mdash; saldo, limite e per&iacute;odo</summary>
+      <div class="grade-campos" style="margin-top:14px">
+        <label class="campo">Saldo hoje
+          <input type="text" id="cfg-saldo" inputmode="decimal" placeholder="0,00">
+          <span class="dica">o que est&aacute; na conta corrente agora</span>
+        </label>
+        <label class="campo">Data de refer&ecirc;ncia
+          <input type="date" id="cfg-data">
+        </label>
+        <label class="campo">O m&ecirc;s come&ccedil;a em
+          <select id="cfg-ancora"></select>
+          <span class="dica">s&oacute; agrupa o hist&oacute;rico; o fluxo &eacute; cont&iacute;nuo</span>
+        </label>
+        <label class="campo">Limite negativo permitido
+          <input type="text" id="cfg-limite" inputmode="decimal" placeholder="3.300,00">
+          <span class="dica">quanto a conta deixa ficar no vermelho</span>
+        </label>
+        <label class="campo">Dias no vermelho sem juros
+          <input type="number" id="cfg-dias" min="0" max="60" step="1">
+          <span class="dica">a franquia que o banco d&aacute;</span>
+        </label>
+        <label class="campo">Como o banco conta
+          <select id="cfg-modo-franquia">
+            <option value="mensal">Somados no ciclo</option>
+            <option value="corridos">Corridos seguidos</option>
+          </select>
+          <span class="dica">&quot;10 dias esse m&ecirc;s&quot; = somados</span>
+        </label>
+        <label class="campo">Dias j&aacute; usados no ciclo
+          <input type="number" id="cfg-dias-usados" min="0" max="60" step="1">
+          <span class="dica">o &quot;total de dias em uso&quot; do app do banco</span>
+        </label>
+        <label class="campo">Dia da virada do ciclo
+          <input type="number" id="cfg-virada" min="1" max="28" step="1">
+          <span class="dica">quando o contador de juros zera</span>
+        </label>
+        <label class="campo">Colch&atilde;o de seguran&ccedil;a
+          <input type="text" id="cfg-colchao" inputmode="decimal" placeholder="0,00">
+          <span class="dica">folga que nunca &eacute; usada: sobe o piso do saldo</span>
+        </label>
+        <label class="campo">Aporte m&iacute;nimo
+          <input type="text" id="cfg-minimo" inputmode="decimal" placeholder="100,00">
+          <span class="dica">n&atilde;o sugerir troco</span>
+        </label>
+        <label class="campo">Horizonte
+          <span class="dica">at&eacute; onde a proje&ccedil;&atilde;o enxerga</span>
+          <select id="cfg-horizonte">
+            <option value="2">2 meses</option>
+            <option value="3">3 meses</option>
+            <option value="4">4 meses</option>
+            <option value="6">6 meses</option>
+            <option value="12">12 meses</option>
+          </select>
+        </label>
+      </div>
+      <div class="barra-botoes">
+        <label class="linha-check"><input type="checkbox" id="cfg-conservador"> Modo conservador (nunca ficar negativo)</label>
+        <label class="linha-check"><input type="checkbox" id="cfg-bancario"> Bancos fechados em 24 e 31/12</label>
+      </div>
+    </details>
   </section>
 
-  <!-- ============================================================ DADOS -->
+  <!-- =========================================================== DETALHES -->
+  <section class="cartao">
+    <details class="dobra">
+      <summary>Saldo projetado, dia a dia</summary>
+      <div style="margin-top:14px">
+        <div class="legenda">
+          <span class="chave"><i style="background: var(--serie-1)"></i> Sem tirar nada</span>
+          <span class="chave" id="chave-com-plano"><i style="background: var(--serie-2)"></i> Depois do plano</span>
+          <span class="chave" style="color: var(--critico)"><i class="tracejado"></i> Limite negativo</span>
+        </div>
+        <div class="moldura-grafico">
+          <svg class="grafico" id="grafico" role="img" aria-label="Saldo di&aacute;rio projetado"></svg>
+          <div class="dica-flutuante" id="dica-grafico" aria-hidden="true"></div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="cartao">
+    <details class="dobra">
+      <summary>Extrato projetado</summary>
+      <div style="margin-top:14px">
+        <p class="subtitulo">
+          Somente os dias com movimento e os dias no vermelho.
+          <label class="linha-check" style="display:inline-flex; margin-left:10px">
+            <input type="checkbox" id="chk-todos-dias"> mostrar todos os dias
+          </label>
+        </p>
+        <div class="rolagem"><table id="tabela-extrato">
+          <thead><tr>
+            <th>Data</th><th>Dia</th><th>Lan&ccedil;amentos</th>
+            <th class="num">Entra</th><th class="num">Sai</th><th class="num">Aporte</th>
+            <th class="num">Saldo</th><th>Vermelho</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </details>
+  </section>
+
   <section class="cartao">
     <details class="dobra">
       <summary>Feriados, backup e reinicializa&ccedil;&atilde;o</summary>
@@ -197,7 +254,7 @@
           <button id="btn-exportar">Baixar backup (JSON)</button>
           <button id="btn-importar">Restaurar backup</button>
           <input type="file" id="arquivo-importar" accept="application/json,.json" class="oculto">
-          <button id="btn-exemplo">Recarregar exemplo</button>
+          <button id="btn-exemplo">Recarregar lista padr&atilde;o</button>
           <button id="btn-zerar" class="perigo">Apagar tudo</button>
         </div>
         <p class="vazio" id="status-dados"></p>
@@ -206,7 +263,7 @@
   </section>
 
   <p class="rodape">
-    Os dados ficam s&oacute; neste navegador (localStorage). Nada sai daqui.<br>
+    Os dados ficam s&oacute; neste navegador. Baixe o backup de vez em quando.<br>
     Estimativa de planejamento &mdash; confirme datas e tarifas com o seu banco.
   </p>
 </div>

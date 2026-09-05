@@ -411,3 +411,79 @@ test('o cenario do usuario: conta de 1000 hoje, entram 2000 em cinco dias', () =
   assert.strictEqual(a.menorSaldo, -100000, 'fica 1000 negativo, como ele descreveu');
   assert.strictEqual(a.ciclos[0].dias, 4, 'consome 4 dos 10 dias de setembro');
 });
+
+// ---------------------------------------------- periodos de competencia
+
+test('o periodo comeca no marco e leva o nome do mes do marco', () => {
+  // Salario no 5o dia util: 08/09, 07/10, 09/11 (Finados empurra).
+  const regra = [{ id: 's', nome: 'Salário', tipo: 'entrada', valor: 1,
+                   agenda: { tipo: 'diaUtil', n: 5 }, valoresPorMes: {} }];
+  const ini = E.isoParaDia('2026-09-05');
+  const fim = E.isoParaDia('2026-11-30');
+  const marcos = E.expandirRegras(regra, ini, fim, cal).map((l) => l.dia);
+  const ps = E.calcularPeriodos(marcos, ini, fim);
+  assert.deepStrictEqual(
+    ps.map((p) => [p.rotulo, E.diaParaIso(p.inicio), E.diaParaIso(p.fim), p.parcial]),
+    [
+      ['ago/2026', '2026-09-05', '2026-09-07', true],  // sobra antes do 1o marco
+      ['set/2026', '2026-09-08', '2026-10-06', false],
+      ['out/2026', '2026-10-07', '2026-11-08', false],
+      ['nov/2026', '2026-11-09', '2026-11-30', true]   // cortado pelo horizonte
+    ]
+  );
+});
+
+test('periodo sem nenhum marco na janela vira um so, parcial', () => {
+  const ini = E.isoParaDia('2026-09-05');
+  const fim = E.isoParaDia('2026-09-20');
+  const ps = E.calcularPeriodos([], ini, fim);
+  assert.strictEqual(ps.length, 1);
+  assert.strictEqual(ps[0].parcial, true);
+  assert.strictEqual(ps[0].rotulo, 'set/2026');
+});
+
+test('marco caindo no primeiro dia da janela nao cria sobra vazia', () => {
+  const ini = E.isoParaDia('2026-09-08');
+  const fim = E.isoParaDia('2026-10-20');
+  const ps = E.calcularPeriodos([ini, E.isoParaDia('2026-10-07')], ini, fim);
+  assert.deepStrictEqual(ps.map((p) => p.rotulo), ['set/2026', 'out/2026']);
+  assert.strictEqual(E.diaParaIso(ps[0].inicio), '2026-09-08');
+});
+
+test('periodoDoDia acha o periodo de qualquer dia da janela', () => {
+  const ini = E.isoParaDia('2026-09-05');
+  const fim = E.isoParaDia('2026-11-30');
+  const ps = E.calcularPeriodos([E.isoParaDia('2026-09-08'), E.isoParaDia('2026-10-07')], ini, fim);
+  assert.strictEqual(E.periodoDoDia(ps, E.isoParaDia('2026-09-06')).rotulo, 'ago/2026');
+  assert.strictEqual(E.periodoDoDia(ps, E.isoParaDia('2026-09-08')).rotulo, 'set/2026');
+  assert.strictEqual(E.periodoDoDia(ps, E.isoParaDia('2026-10-06')).rotulo, 'set/2026');
+  assert.strictEqual(E.periodoDoDia(ps, E.isoParaDia('2026-10-07')).rotulo, 'out/2026');
+  assert.strictEqual(E.periodoDoDia(ps, E.isoParaDia('2026-12-25')), null);
+});
+
+test('a virada do ano nao quebra o nome do periodo anterior', () => {
+  assert.strictEqual(E.mesAnteriorDe('2026-01'), '2025-12');
+  const ini = E.isoParaDia('2026-01-03');
+  const ps = E.calcularPeriodos([E.isoParaDia('2026-01-08')], ini, E.isoParaDia('2026-01-31'));
+  assert.strictEqual(ps[0].rotulo, 'dez/2025');
+});
+
+test('o plano parte das transferencias ja feitas, sem reproposta-las', () => {
+  const lancamentos = [lanc('2026-09-20', 3000, 'Salario')];
+  const ctx = ctxDe({ saldo: 2000, inicio: '2026-09-05', fim: '2026-12-31',
+                      lancamentos, piso: 0, maxDias: 0 });
+  const d1 = E.isoParaDia('2026-09-05');
+  const d2 = E.isoParaDia('2026-09-20');
+  const semNada = E.planoDeAportes(ctx, [d1, d2], 0);
+  const jaTirou = { dia: d1, centavos: E.paraCentavos(800) };
+  const comAporte = E.planoDeAportes(ctx, [d1, d2], 0, [jaTirou]);
+
+  const totalSem = semNada.linhas.reduce(function (s, l) { return s + l.centavos; }, 0);
+  const totalCom = comAporte.linhas.reduce(function (s, l) { return s + l.centavos; }, 0);
+  assert.strictEqual(totalSem - totalCom, E.paraCentavos(800), 'o que ja saiu deixa de ser proposto');
+  // `retiradas` ja traz o aporte inicial junto - somar de novo contaria em dobro.
+  assert.ok(comAporte.retiradas.some(function (x) { return x.dia === d1 && x.centavos === jaTirou.centavos; }));
+  assert.strictEqual(comAporte.retiradas.length, comAporte.linhas.length + 1);
+  const proj = E.projetarComRetiradas(ctx, comAporte.retiradas);
+  assert.strictEqual(E.avaliar(proj, ctx.restricoes).ok, true);
+});
