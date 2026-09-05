@@ -118,9 +118,38 @@ node --test test/     # 36 testes do motor de cálculo
 node build.js         # gera dist/fluxo-caixa.html, arquivo único
 ```
 
-`dist/fluxo-caixa.html` tem CSS e JS embutidos — é o arquivo para mandar para o
-celular ou para outra máquina. Cada navegador guarda os próprios dados, então
-use **Baixar backup (JSON)** e **Restaurar backup** para levá-los junto.
+`dist/fluxo-caixa.html` tem CSS e JS embutidos — é o arquivo para mandar por
+e-mail ou copiar para outra máquina. Cada navegador guarda os próprios dados,
+então use **Baixar backup (JSON)** e **Restaurar backup** para levá-los junto.
+
+## Instalar como aplicativo no celular
+
+O app é instalável: manifest, ícone e service worker (abre sem internet depois
+da primeira visita). Mas **"Adicionar à Tela de Início" exige um endereço
+https** — um arquivo solto no celular não vira aplicativo.
+
+O jeito mais direto é o GitHub Pages, que já vem configurado em
+`.github/workflows/pages.yml`:
+
+1. No repositório: **Settings › Pages › Build and deployment › Source:
+   "GitHub Actions"**.
+2. Faça o push na branch padrão (ou rode o workflow à mão em **Actions ›
+   Publicar no GitHub Pages › Run workflow**).
+3. Abra o endereço publicado no **Safari** (no iPhone tem que ser o Safari),
+   toque em **Compartilhar › Adicionar à Tela de Início**.
+
+Fica com ícone próprio, abre em tela cheia sem barra de navegação e funciona no
+avião.
+
+**Dois cuidados com os dados**, e eles são reais:
+
+- O app instalado tem um **armazenamento separado do Safari**. O que você
+  digitou no navegador não aparece no ícone da tela de início. Exporte o backup
+  no Safari e importe no app instalado, ou simplesmente comece a preencher já
+  dentro do app.
+- O iOS pode **apagar o armazenamento de sites** que ficam muito tempo sem uso.
+  Não é um banco de dados: **baixe o backup JSON de vez em quando**, sobretudo
+  depois de cadastrar tudo.
 
 ## Arquivos
 
@@ -131,6 +160,9 @@ use **Baixar backup (JSON)** e **Restaurar backup** para levá-los junto.
 | `src/styles.css` | tokens de cor, tema claro e escuro |
 | `test/engine.test.js` | testes do motor |
 | `build.js` | empacota tudo num HTML só |
+| `sw.js` | service worker: abre sem internet |
+| `manifest.webmanifest` | nome, ícone e modo tela cheia |
+| `icones/` | ícone em SVG, PNGs gerados e o script que os gera |
 
 O motor não conhece o DOM e roda em Node — por isso dá para testar as regras de
 calendário e o solver sem abrir navegador.
@@ -141,3 +173,11 @@ Estimativa de planejamento, não extrato bancário. Não conhece tarifas, juros 
 cheque especial, rendimento do investimento nem IOF/IR no resgate. A resposta é
 tão boa quanto os lançamentos cadastrados: reembolso que você não previu não
 entra na conta.
+
+**Não puxa dados do banco, e não é por preguiça.** O Open Finance do Brasil só
+libera acesso às APIs para instituições autorizadas pelo Banco Central; pessoa
+física não obtém credencial. Dá para chegar lá por um agregador certificado
+(Pluggy, Belvo e afins), mas isso é contrato comercial, normalmente com CNPJ, e
+significa entregar o consentimento das suas contas a um terceiro — desproporcional
+para uma calculadora pessoal. O saldo de hoje você digita; é um campo só, uma
+vez por dia.

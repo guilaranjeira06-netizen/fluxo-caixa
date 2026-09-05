@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fundo opaco: o iOS nao respeita transparencia no icone da tela de inicio. -->
+  <rect width="512" height="512" fill="#12233d"/>
+  <!-- A linha do zero. -->
+  <line x1="58" y1="272" x2="454" y2="272" stroke="#7b8ba3" stroke-width="9" stroke-linecap="round"/>
+  <g fill="none" stroke-width="34" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Saldo positivo, antes e depois. -->
+    <path d="M72 196 H206 V272" stroke="#4d94ef"/>
+    <path d="M334 272 V158 H440" stroke="#4d94ef"/>
+    <!-- O mergulho no vermelho, que e' o que o app existe para calcular. -->
+    <path d="M206 272 V352 H334 V272" stroke="#e06a58"/>
+  </g>
+</svg>

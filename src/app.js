@@ -333,14 +333,24 @@
       // so' carrega o contador do banco nao significa que o plano use o vermelho.
       var ciclos = (a.ciclos || []).filter(function (c) { return c.dias > c.jaUsados; });
       if (!ciclos.length) return '';
-      var partes = ciclos.map(function (c) {
+
+      function descrever(c) {
         var novos = c.dias - c.jaUsados;
         return '<b>' + novos + ' dia' + (novos > 1 ? 's' : '') + '</b> em ' + c.rotulo +
                ' (' + c.dias + ' de ' + limite + ' no ciclo' +
                (c.jaUsados ? ', contando os ' + c.jaUsados + ' já usados' : '') + ')';
-      });
-      return '<b>Esse plano usa o vermelho.</b> Consome ' + partes.join(' e ') +
-             '. O pior saldo é ' + pior + '.';
+      }
+
+      // Num horizonte de meses, listar todo ciclo vira parede de texto. O que
+      // interessa e' o ciclo atual (o que da' para agir hoje) e o mais apertado.
+      var texto = '<b>Esse plano usa o vermelho.</b> Consome ' + descrever(ciclos[0]);
+      if (ciclos.length > 1) {
+        var apertado = ciclos.slice(1).reduce(function (x, y) { return y.dias > x.dias ? y : x; });
+        texto += '. Nos meses seguintes o mais apertado é <b>' + apertado.rotulo + '</b>, com ' +
+                 apertado.dias + ' de ' + limite +
+                 (ciclos.length > 2 ? ' (ao todo ' + ciclos.length + ' meses com vermelho)' : '');
+      }
+      return texto + '. O pior saldo é ' + pior + '.';
     }
 
     var seqs = (a.sequencias || []).filter(function (s) { return s.dias > 0; });
@@ -1028,7 +1038,22 @@
     preencherConfig();
     ligarConfig();
     aplicar();
+    registrarServiceWorker();
     window.addEventListener('resize', function () { renderGrafico(calcular()); });
+  }
+
+  /**
+   * Faz o app abrir sem rede depois da primeira visita.
+   *
+   * Service worker so' roda em contexto seguro. isSecureContext e' a checagem
+   * certa: cobre https, localhost E 127.0.0.1 de uma vez, sem a lista de
+   * excecoes que sempre esquece alguma. Aberto por file:// nao registra nada.
+   */
+  function registrarServiceWorker() {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+    try {
+      navigator.serviceWorker.register('sw.js').catch(function () { /* segue sem offline */ });
+    } catch (err) { /* segue sem offline */ }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);

@@ -1,0 +1,54 @@
+# Publica o app no GitHub Pages, para dar um endereco https - que e' o que o
+# iPhone exige para "Adicionar a Tela de Inicio" virar aplicativo de verdade.
+#
+# Antes do primeiro uso: Settings > Pages > Build and deployment > Source:
+# "GitHub Actions". Depois disso, todo push na branch padrao republica.
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test test/
+      - run: node build.js
+
+  publicar:
+    needs: testar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Montar o site
+        run: |
+          node build.js
+          mkdir -p site
+          cp -r index.html manifest.webmanifest sw.js src icones dist site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

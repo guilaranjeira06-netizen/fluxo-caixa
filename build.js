@@ -20,6 +20,13 @@ const app = ler('src/app.js');
 // Fecha </script> dentro de string JS quebraria o HTML que o envolve.
 const escapar = (js) => js.replace(/<\/script/gi, '<\\/script');
 
+// O arquivo unico e' para abrir por file://, onde manifest, icones e service
+// worker nao existem. Tirar os links evita 404 silencioso e um icone quebrado.
+html = html.replace(
+  /\n<!-- Instalacao na tela de inicio -->[\s\S]*?<meta name="theme-color"[^>]*media="\(prefers-color-scheme: dark\)">\n/,
+  '\n'
+);
+
 const antes = html;
 html = html.replace(
   '<link rel="stylesheet" href="src/styles.css">',

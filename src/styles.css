@@ -64,7 +64,13 @@ body {
   font: 15px/1.5 var(--fonte);
   -webkit-text-size-adjust: 100%;
 }
-.envelope { max-width: 1080px; margin: 0 auto; padding: 20px 16px 72px; }
+.envelope {
+  max-width: 1080px;
+  margin: 0 auto;
+  /* Em standalone o conteudo vai ate a borda da tela: respeita notch e barra. */
+  padding: calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+           calc(72px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+}
 
 /* ------------------------------------------------------------- cabecalho */
 .topo { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
