@@ -1723,7 +1723,7 @@ details.dobra[open] > summary::before { transform: rotate(90deg); }
       : '';
 
     if (!r.viavel) {
-      rotulo.textContent = 'Pode transferir em ' + nomeDoMes;
+      rotulo.textContent = 'Pode transferir no mês ' + nomeDoMes;
       heroi.textContent = 'R$ 0,00';
       heroi.className = 'heroi ruim';
       nota.textContent = 'A conta não fecha nem sem tirar nada. Veja o alerta acima.';
@@ -1732,7 +1732,7 @@ details.dobra[open] > summary::before { transform: rotate(90deg); }
       // O numero que ele pediu e' o do MES, nao o de hoje: hoje o dinheiro pode
       // nem estar na conta ainda. O de hoje continua logo abaixo, porque e' ele
       // que responde "transfiro agora?".
-      rotulo.textContent = 'Pode transferir em ' + nomeDoMes;
+      rotulo.textContent = 'Pode transferir no mês ' + nomeDoMes;
       heroi.textContent = E.formatarBRL(r.noPeriodo);
       heroi.className = 'heroi';
       var detalhe = detalharPeriodo(r);
@@ -1796,10 +1796,13 @@ details.dobra[open] > summary::before { transform: rotate(90deg); }
       fato(fatos, 'Dia mais apertado', E.formatarBRL(menor.saldo), dataLonga(menor.iso));
     }
     var totalPlano = r.plano.linhas.reduce(function (soma, l) { return soma + l.centavos; }, 0);
+    // "Total planejado" sozinho, tres vezes maior que o destaque, se confunde
+    // com a resposta da tela. O rotulo tem que dizer que ele NAO e' deste mes.
     var ultimaLinha = r.plano.linhas[r.plano.linhas.length - 1];
-    fato(fatos, 'Total planejado', E.formatarBRL(totalPlano),
+    var meses = horizonteValido();
+    fato(fatos, 'Somando os próximos ' + meses + ' meses', E.formatarBRL(totalPlano),
          r.plano.linhas.length + ' aporte(s)' +
-         (ultimaLinha ? ' até ' + comAno(ultimaLinha.dia) : ''));
+         (ultimaLinha ? ', até ' + comAno(ultimaLinha.dia) : ''));
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
