@@ -287,8 +287,13 @@
                 p.inicio === periodoAtual.inicio;
     });
 
+    var ancoraAtual = (estado.ancoraPeriodo || {}).tipo === 'regra'
+      ? (estado.regras || []).find(function (x) { return x.id === estado.ancoraPeriodo.regraId; })
+      : null;
+
     return {
       periodos: periodos, periodoAtual: periodoAtual, aportes: aportes,
+      nomeDaAncora: ancoraAtual ? ancoraAtual.nome : null,
       noPeriodo: periodoAtual ? periodoAtual.planejado : 0,
       calendario: calendario, ctx: ctx, restricoes: restricoes,
       diaInicio: diaInicio, diaFimExibicao: diaFimExibicao,
@@ -313,7 +318,12 @@
     if (ancora.tipo === 'regra') {
       var regra = (estado.regras || []).find(function (x) { return x.id === ancora.regraId; });
       if (regra) {
-        return E.expandirRegras([Object.assign({}, regra, { ativo: true })], de, ate, calendario)
+        // Daqui so' interessam as DATAS. O valor e' forcado porque
+        // expandirRegras descarta lancamento de valor zero: com os valores
+        // ainda em branco, a regra nao gerava data nenhuma, o periodo virava a
+        // janela inteira e o cabecalho dizia "mes de ago/2026 - 01/08 a 05/12".
+        var soDatas = Object.assign({}, regra, { ativo: true, valor: 1, valoresPorMes: {} });
+        return E.expandirRegras([soDatas], de, ate, calendario)
                 .map(function (l) { return l.dia; });
       }
     }
@@ -341,9 +351,11 @@
     avisos.textContent = '';
 
     var nomeDoMes = r.periodoAtual ? r.periodoAtual.rotulo : 'este mês';
+    // Dizer QUEM abriu o periodo evita a pergunta "por que agosto, se hoje e
+    // setembro?" - o mes e' o do pagamento que voce esta gastando agora.
     $('#rotulo-periodo-topo').textContent = r.periodoAtual
-      ? 'mês de ' + r.periodoAtual.rotulo + ' · ' + comAno(r.periodoAtual.inicio) +
-        ' a ' + comAno(r.periodoAtual.fim)
+      ? 'mês ' + r.periodoAtual.rotulo + ' · ' + comAno(r.periodoAtual.inicio) +
+        (r.nomeDaAncora ? ' (' + r.nomeDaAncora + ')' : '') + ' a ' + comAno(r.periodoAtual.fim)
       : '';
 
     if (!r.viavel) {

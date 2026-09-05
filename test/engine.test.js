@@ -487,3 +487,26 @@ test('o plano parte das transferencias ja feitas, sem reproposta-las', () => {
   const proj = E.projetarComRetiradas(ctx, comAporte.retiradas);
   assert.strictEqual(E.avaliar(proj, ctx.restricoes).ok, true);
 });
+
+test('as datas de uma regra saem mesmo com valor zero, quando o valor e forcado', () => {
+  // O periodo de competencia so' precisa das DATAS. Como expandirRegras
+  // descarta lancamento de valor zero, quem quer so' as datas precisa forcar
+  // um valor - senao uma regra ainda sem valor preenchido nao gera marco algum.
+  const semValor = { id: 's', nome: 'Salário', tipo: 'entrada', valor: 0, ativo: true,
+                     agenda: { tipo: 'diaUtil', n: 5 }, valoresPorMes: {} };
+  const de = E.isoParaDia('2026-08-01');
+  const ate = E.isoParaDia('2026-10-31');
+  assert.strictEqual(E.expandirRegras([semValor], de, ate, cal).length, 0,
+                     'valor zero nao gera lancamento, por design');
+
+  const soDatas = Object.assign({}, semValor, { valor: 1 });
+  const marcos = E.expandirRegras([soDatas], de, ate, cal).map((l) => l.dia);
+  assert.deepStrictEqual(marcos.map(E.diaParaIso), ['2026-08-07', '2026-09-08', '2026-10-07']);
+
+  // E com esses marcos os periodos saem certos, em vez de um bloco unico.
+  const ps = E.calcularPeriodos(marcos, de, ate);
+  assert.deepStrictEqual(
+    ps.filter((p) => !p.parcial).map((p) => p.rotulo + ' ' + E.diaParaIso(p.inicio) + '..' + E.diaParaIso(p.fim)),
+    ['ago/2026 2026-08-07..2026-09-07', 'set/2026 2026-09-08..2026-10-06']
+  );
+});
