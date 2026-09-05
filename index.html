@@ -34,14 +34,35 @@
        &mdash; falta informar quanto &eacute; cada um, l&aacute; embaixo.</p>
   </div>
 
+  <!-- ================================================== PRIMEIRO CONTATO -->
+  <section class="cartao oculto" id="cartao-setup">
+    <h2>Comece por aqui</h2>
+    <ol class="passos">
+      <li><b>Informe o saldo</b> que est&aacute; na sua conta corrente agora.</li>
+      <li><b>Preencha o valor</b> de cada lan&ccedil;amento &mdash; a lista j&aacute; est&aacute; montada.</li>
+      <li>Pronto: o app passa a dizer quanto d&aacute; para transferir.</li>
+    </ol>
+    <label class="campo campo-saldo">Saldo em conta agora
+      <input type="text" id="setup-saldo" inputmode="decimal" placeholder="0,00">
+    </label>
+    <div class="barra-botoes">
+      <button id="btn-ir-lancamentos" class="principal">Preencher os lan&ccedil;amentos</button>
+    </div>
+  </section>
+
   <!-- ====================================================== A RESPOSTA -->
-  <section class="cartao">
+  <section class="cartao" id="cartao-resposta">
     <div id="avisos"></div>
     <div class="resposta">
       <div>
         <div class="rotulo-heroi" id="rotulo-heroi">Pode transferir para investimento</div>
         <div class="heroi" id="valor-heroi">&mdash;</div>
         <div class="heroi-nota" id="nota-heroi"></div>
+        <div class="linha-saldo">
+          <label class="campo campo-saldo">Saldo em conta hoje
+            <input type="text" id="cfg-saldo" inputmode="decimal" placeholder="0,00">
+          </label>
+        </div>
         <div class="barra-botoes">
           <button id="btn-registrar" class="principal">Registrar transfer&ecirc;ncia</button>
         </div>
@@ -72,7 +93,7 @@
   </section>
 
   <!-- ================================================ APORTES POR PERIODO -->
-  <section class="cartao">
+  <section class="cartao" id="cartao-aportes">
     <div class="cabecalho-secao"><h2>Transferido por m&ecirc;s</h2></div>
     <p class="subtitulo" id="sub-aportes"></p>
     <div class="legenda barras" id="legenda-aportes">
@@ -96,7 +117,7 @@
   </section>
 
   <!-- ================================================== PLANO DE APORTES -->
-  <section class="cartao">
+  <section class="cartao" id="cartao-plano">
     <div class="cabecalho-secao"><h2>Quando d&aacute; para transferir</h2></div>
     <details class="dobra ajuda">
       <summary>como funciona</summary>
@@ -143,14 +164,11 @@
   <!-- ====================================================== CONFIGURACAO -->
   <section class="cartao">
     <details class="dobra" id="dobra-conta">
-      <summary>Sua conta &mdash; saldo, limite e per&iacute;odo</summary>
+      <summary>Configura&ccedil;&atilde;o &mdash; limite, franquia e per&iacute;odo</summary>
       <div class="grade-campos" style="margin-top:14px">
-        <label class="campo">Saldo hoje
-          <input type="text" id="cfg-saldo" inputmode="decimal" placeholder="0,00">
-          <span class="dica">o que est&aacute; na conta corrente agora</span>
-        </label>
         <label class="campo">Data de refer&ecirc;ncia
           <input type="date" id="cfg-data">
+          <span class="dica">anda sozinha para hoje; mude s&oacute; para simular</span>
         </label>
         <label class="campo">O m&ecirc;s come&ccedil;a em
           <select id="cfg-ancora"></select>

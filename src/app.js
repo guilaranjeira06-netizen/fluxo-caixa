@@ -287,13 +287,20 @@
                 p.inicio === periodoAtual.inicio;
     });
 
+    // "Ainda nao configurado" e' diferente de "nao sobra nada": sem saldo e sem
+    // nenhum valor lancado, qualquer numero que o app mostre e' invencao.
+    var semDados = E.paraCentavos(estado.saldoInicial) === 0 &&
+      !(estado.regras || []).some(function (x) {
+        return x.ativo !== false && Math.abs(E.paraCentavos(x.valor)) > 0;
+      });
+
     var ancoraAtual = (estado.ancoraPeriodo || {}).tipo === 'regra'
       ? (estado.regras || []).find(function (x) { return x.id === estado.ancoraPeriodo.regraId; })
       : null;
 
     return {
       periodos: periodos, periodoAtual: periodoAtual, aportes: aportes,
-      nomeDaAncora: ancoraAtual ? ancoraAtual.nome : null,
+      nomeDaAncora: ancoraAtual ? ancoraAtual.nome : null, semDados: semDados,
       noPeriodo: periodoAtual ? periodoAtual.planejado : 0,
       calendario: calendario, ctx: ctx, restricoes: restricoes,
       diaInicio: diaInicio, diaFimExibicao: diaFimExibicao,
@@ -344,6 +351,20 @@
   // ------------------------------------------------------- render: resposta
 
   function renderResposta(r) {
+    // Enquanto nao ha dado nenhum, mostrar um painel de zeros com "nao sobra
+    // nada" e um botao azul de transferir e' pior que nao mostrar nada: parece
+    // um veredito financeiro quando e' so' um formulario em branco.
+    $('#cartao-setup').classList.toggle('oculto', !r.semDados);
+    ['#cartao-resposta', '#cartao-aportes', '#cartao-plano'].forEach(function (sel) {
+      $(sel).classList.toggle('oculto', r.semDados);
+    });
+    if (r.semDados) {
+      $('#setup-saldo').value = paraCampo(E.paraCentavos(estado.saldoInicial));
+      $('#banner-exemplo').classList.add('oculto');
+      $('#rotulo-periodo-topo').textContent = '';
+      return;
+    }
+
     var heroi = $('#valor-heroi');
     var nota = $('#nota-heroi');
     var rotulo = $('#rotulo-heroi');
@@ -371,7 +392,10 @@
       rotulo.textContent = 'Pode transferir em ' + nomeDoMes;
       heroi.textContent = E.formatarBRL(r.noPeriodo);
       heroi.className = 'heroi';
-      nota.innerHTML = detalharPeriodo(r) + '<br><br>' + explicarTrava(r);
+      var detalhe = detalharPeriodo(r);
+      var trava = explicarTrava(r);
+      // Sem detalhe, o <br><br> deixava um buraco no meio do cartao.
+      nota.innerHTML = detalhe && trava ? detalhe + '<br><br>' + trava : (detalhe || trava);
 
       var usoDoVermelho = resumoDoVermelho(r);
       if (usoDoVermelho) {
@@ -1006,10 +1030,12 @@
         var meio = (ySem + yCom) / 2;
         ySem = meio - 7; yCom = meio + 7;
       }
-      svg.appendChild(texto('sem tirar', {
+      // Em tela estreita a margem direita nao comporta "com plano" inteiro, e o
+      // rotulo saia cortado. A legenda logo acima ja da o nome por extenso.
+      svg.appendChild(texto(m.estreito ? 'sem' : 'sem tirar', {
         x: x(ultimo) + 6, y: ySem + 4, 'font-size': 11, fill: 'var(--serie-1)'
       }));
-      svg.appendChild(texto('com plano', {
+      svg.appendChild(texto(m.estreito ? 'plano' : 'com plano', {
         x: x(ultimo) + 6, y: yCom + 4, 'font-size': 11, fill: 'var(--serie-2)'
       }));
     }
@@ -1169,6 +1195,7 @@
     linha.appendChild(criar('div', { class: 'c-remover' }, [criar('button', {
       class: 'discreto perigo', title: 'Remover', text: '×',
       onclick: function () {
+        if (!confirm('Remover "' + (regra.nome || 'este lançamento') + '"?')) return;
         estado.regras = estado.regras.filter(function (x) { return x.id !== regra.id; });
         aplicar();
       }
@@ -1234,6 +1261,23 @@
     return l;
   }
 
+  /**
+   * Campo de dinheiro seleciona o conteudo ao receber foco.
+   *
+   * Sem isso, tocar num campo que mostra "0,00" e digitar 6400 produz
+   * "0,006400" - que o parser le como um centavo. O usuario ve R$ 0,01 onde
+   * esperava R$ 6.400,00 e pode transferir com base no numero errado.
+   */
+  function selecionarAoFocar(input) {
+    var selecionar = function () {
+      // requestAnimationFrame: no iOS o toque reposiciona o cursor DEPOIS do
+      // focus, e uma selecao feita agora seria desfeita em seguida.
+      requestAnimationFrame(function () { try { input.select(); } catch (err) { /* ignora */ } });
+    };
+    input.addEventListener('focus', selecionar);
+    input.addEventListener('click', selecionar);
+  }
+
   function inputTexto(valor, aoMudar) {
     var i = criar('input', { type: 'text', value: valor == null ? '' : valor });
     i.addEventListener('change', function () {
@@ -1244,6 +1288,7 @@
   }
   function inputDinheiro(valorReais, aoMudar) {
     var i = criar('input', { type: 'text', inputmode: 'decimal', value: paraCampo(E.paraCentavos(valorReais)) });
+    selecionarAoFocar(i);
     i.addEventListener('change', function () {
       var c = E.paraCentavos(i.value);
       i.value = paraCampo(c);
@@ -1333,6 +1378,10 @@
   }
 
   function ligarConfig() {
+    // Os campos de dinheiro fixos no HTML ganham o mesmo comportamento.
+    ['#cfg-saldo', '#cfg-limite', '#cfg-colchao', '#cfg-minimo', '#setup-saldo', '#reg-valor']
+      .forEach(function (sel) { var el = $(sel); if (el) selecionarAoFocar(el); });
+
     function dinheiro(sel, chave) {
       $(sel).addEventListener('change', function () {
         var c = E.paraCentavos($(sel).value);
@@ -1394,6 +1443,19 @@
     });
     ao('#btn-zerar', 'click', function () {
       if (confirm('Apagar todos os lançamentos e começar do zero?')) { estado = estadoVazio(); aplicar({ campos: true }); }
+    });
+    ao('#setup-saldo', 'change', function () {
+      var c = E.paraCentavos($('#setup-saldo').value);
+      estado.saldoInicial = E.paraReais(c);
+      estado.saldoInformadoEm = estado.dataReferencia;
+      estado.exemplo = false;
+      aplicar({ campos: true });
+    });
+    ao('#btn-ir-lancamentos', 'click', function () {
+      var alvo = $('#lista-entradas');
+      if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var primeiro = document.querySelector('.regra .c-valor input');
+      if (primeiro) setTimeout(function () { primeiro.focus(); primeiro.select(); }, 450);
     });
     ao('#btn-registrar', 'click', function () { abrirRegistro(ultimoResultado); });
     ao('#reg-cancelar', 'click', fecharRegistro);

@@ -300,3 +300,50 @@ details.ajuda p { margin: 8px 0 0; font-size: 13px; color: var(--tinta-2); }
 
   th, td { padding: 7px 6px; }
 }
+
+/* ------------------------------------------------ primeiro contato e toque */
+
+.passos { margin: 0 0 16px; padding-left: 20px; color: var(--tinta-2); font-size: 14px; line-height: 1.65; }
+.passos li { margin-bottom: 4px; }
+.passos b { color: var(--tinta); }
+
+/* O saldo e' o unico numero que muda todo dia: fica no cartao da resposta,
+   nao enterrado na configuracao. */
+.linha-saldo { display: flex; gap: 10px; align-items: flex-end; margin: 14px 0 4px; flex-wrap: wrap; }
+.linha-saldo .campo-saldo { flex: 1 1 150px; }
+.linha-saldo .campo-data  { flex: 0 1 150px; }
+.campo-saldo input { font-size: 16px; font-weight: 600; }
+
+/* Alvos de toque. Caixas de 13px sao impossiveis no dedo. */
+input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--serie-1); }
+.linha-check { min-height: 34px; }
+.regra .c-ativo input[type="checkbox"] { width: 22px; height: 22px; }
+.c-remover button { min-width: 38px; min-height: 38px; font-size: 19px; line-height: 1; }
+/*
+ * O alvo de toque precisa de altura, mas `display: flex` apaga o triangulo
+ * nativo do <summary> - e sem ele o texto nao parece clicavel. Marcador
+ * proprio, que ainda gira ao abrir.
+ */
+details.dobra > summary {
+  min-height: 40px; display: flex; align-items: center; gap: 8px;
+  list-style: none;
+}
+details.dobra > summary::-webkit-details-marker { display: none; }
+details.dobra > summary::before {
+  content: ''; flex: 0 0 auto;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .15s ease;
+}
+details.dobra[open] > summary::before { transform: rotate(90deg); }
+.cabecalho-secao button { min-height: 38px; }
+
+@media (max-width: 560px) {
+  .linha-saldo .campo-data { flex: 1 1 120px; }
+  #btn-ir-lancamentos { width: 100%; padding: 11px; }
+}
+
+/* Area de toque da caixa de selecao maior que o desenho dela, sem mexer no
+   layout: o padding negativo devolve o espaco que o padding tomou. */
+.regra .c-ativo input[type="checkbox"] { width: 24px; height: 24px; padding: 9px; margin: -9px; }
+.regra .c-ativo { min-height: 42px; display: flex; align-items: center; }
