@@ -48,23 +48,22 @@ jobs:
       - name: Montar o site
         run: node build.js
 
-      # O erro cru do configure-pages quando o Pages esta desligado e
-      # "Resource not accessible by integration", que nao ajuda ninguem. Este
-      # passo diz o que fazer - inclusive o caso de repositorio privado em
-      # plano gratuito, onde o Pages simplesmente nao existe.
-      - name: Conferir se o GitHub Pages esta ligado
-        run: |
-          codigo=$(curl -s -o /dev/null -w '%{http_code}' \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/pages")
-          if [ "$codigo" = "404" ]; then
-            echo "::error title=Pages desligado::Ligue em Settings > Pages > Source: GitHub Actions. Em repositorio PRIVADO isso exige plano pago (Pro/Team); no plano gratuito, ou torne o repositorio publico, ou publique a pasta site/ em outro servico estatico."
-            exit 1
-          fi
-          echo "Pages respondeu $codigo - seguindo."
+      # Tenta ligar o Pages sozinho. Em repositorio publico o token do Actions
+      # costuma conseguir criar o site; em repositorio privado de plano
+      # gratuito, nao - o Pages nem existe la. Por isso a falha e' tratada logo
+      # abaixo em vez de derrubar o job com um erro que nao explica nada.
+      - id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
 
-      - uses: actions/configure-pages@v5
+      - name: Explicar se o Pages nao pode ser ligado
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::error title=Ligue o Pages a mao::O workflow nao conseguiu ligar o GitHub Pages. Va em Settings > Pages > Build and deployment > Source: \"GitHub Actions\" e rode este workflow de novo. Em repositorio privado de plano gratuito o Pages nao existe: torne o repositorio publico ou publique a pasta site/ em outro servico estatico."
+          exit 1
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
