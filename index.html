@@ -84,9 +84,24 @@
         <input type="text" id="cfg-limite" inputmode="decimal" placeholder="2.000,00">
         <span class="dica">quanto a conta deixa ficar no vermelho</span>
       </label>
-      <label class="campo">Dias corridos no vermelho
+      <label class="campo">Dias no vermelho sem juros
         <input type="number" id="cfg-dias" min="0" max="60" step="1">
-        <span class="dica">sem juros, contagem zera ao voltar ao positivo</span>
+        <span class="dica">a franquia que o banco d&aacute;</span>
+      </label>
+      <label class="campo">Como o banco conta
+        <select id="cfg-modo-franquia">
+          <option value="mensal">Somados no ciclo</option>
+          <option value="corridos">Corridos seguidos</option>
+        </select>
+        <span class="dica">&quot;10 dias esse m&ecirc;s&quot; = somados</span>
+      </label>
+      <label class="campo">Dias j&aacute; usados no ciclo
+        <input type="number" id="cfg-dias-usados" min="0" max="60" step="1">
+        <span class="dica">o &quot;total de dias em uso&quot; do app do banco</span>
+      </label>
+      <label class="campo">Dia da virada do ciclo
+        <input type="number" id="cfg-virada" min="1" max="28" step="1">
+        <span class="dica">quando o contador zera; 1 = m&ecirc;s calend&aacute;rio</span>
       </label>
       <label class="campo">Colch&atilde;o de seguran&ccedil;a
         <input type="text" id="cfg-colchao" inputmode="decimal" placeholder="0,00">

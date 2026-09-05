@@ -365,6 +365,35 @@
     return { dias, diaInicio, diaFim };
   }
 
+  // ---------------------------------------------------------------- ciclos
+
+  const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+                        'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+  /**
+   * A que ciclo de cobranca um dia pertence.
+   *
+   * O banco zera a franquia de dias no vencimento, nao no dia 1. Com
+   * `diaVirada` = 1 o ciclo e' o mes calendario; com 15, o ciclo vai do dia 15
+   * de um mes ao dia 14 do seguinte, e o dia 10 ainda conta para o mes anterior.
+   */
+  function chaveCiclo(dia, diaVirada) {
+    const dt = new Date(dia * MS_DIA);
+    let ano = dt.getUTCFullYear();
+    let mes = dt.getUTCMonth() + 1;
+    if (dt.getUTCDate() < (diaVirada || 1)) {
+      mes -= 1;
+      if (mes === 0) { mes = 12; ano -= 1; }
+    }
+    return ano + '-' + doisDigitos(mes);
+  }
+
+  /** '2026-09' -> 'set/2026'. */
+  function rotuloCiclo(chave) {
+    const [ano, mes] = chave.split('-').map(Number);
+    return MESES_CURTOS[mes - 1] + '/' + ano;
+  }
+
   // ------------------------------------------------------------ restricoes
 
   /**
@@ -381,6 +410,8 @@
   function avaliar(projecao, restricoes) {
     const piso = restricoes.pisoCentavos;
     const maxDias = restricoes.maxDiasNegativos;
+    const porCiclo = restricoes.modoFranquia !== 'corridos';
+    const diaVirada = restricoes.diaViradaCiclo || 1;
     const dias = projecao.dias;
 
     let furoPiso = null;
@@ -393,6 +424,29 @@
     let menorSaldoDia = null;
     const sequencias = [];
 
+    // Franquia mensal: o contador do banco soma os dias negativos do ciclo,
+    // estejam eles grudados ou nao. Tres dias agora e quatro daqui a duas
+    // semanas sao sete dias gastos, nao duas sequencias independentes.
+    const ciclos = new Map();
+    const chaveDoPrimeiro = dias.length ? chaveCiclo(dias[0].dia, diaVirada) : null;
+    let estouroCiclo = null;
+
+    function ciclo(chave) {
+      if (!ciclos.has(chave)) {
+        // O ciclo corrente ja' pode ter dias gastos antes de hoje - o
+        // "Total de dias em uso" que o banco mostra.
+        const jaUsados = chave === chaveDoPrimeiro
+          ? Math.max(0, Number(restricoes.diasJaUsadosNoCiclo) || 0)
+          : 0;
+        ciclos.set(chave, {
+          chave, rotulo: rotuloCiclo(chave), jaUsados,
+          dias: jaUsados, limite: maxDias, estourou: false, primeiroDia: null, ultimoDia: null
+        });
+      }
+      return ciclos.get(chave);
+    }
+    if (chaveDoPrimeiro) ciclo(chaveDoPrimeiro);
+
     for (let i = 0; i < dias.length; i++) {
       const d = dias[i];
       if (d.saldo < menorSaldo) { menorSaldo = d.saldo; menorSaldoDia = d; }
@@ -403,6 +457,17 @@
         corrida++;
         if (corrida > piorCorrida) { piorCorrida = corrida; piorCorridaInicio = inicioCorrida; }
         if (estouroCorrida == null && corrida > maxDias) estouroCorrida = d;
+
+        const c = ciclo(chaveCiclo(d.dia, diaVirada));
+        c.dias++;
+        if (c.primeiroDia == null) c.primeiroDia = d;
+        c.ultimoDia = d;
+        d.diaDoCiclo = c.dias;
+        d.ciclo = c;
+        if (c.dias > maxDias) {
+          c.estourou = true;
+          if (estouroCiclo == null) estouroCiclo = { ciclo: c, dia: d };
+        }
       } else if (corrida > 0) {
         sequencias.push({ inicio: inicioCorrida, fim: dias[i - 1], dias: corrida, aberta: false });
         corrida = 0;
@@ -415,9 +480,17 @@
       sequencias.push(sequenciaAberta);
     }
 
-    const ok = furoPiso == null && estouroCorrida == null && sequenciaAberta == null;
+    // A regra da franquia depende do modo; o piso e a sequencia aberta valem
+    // nos dois. Sequencia aberta e' violacao porque os dias que faltam para ela
+    // fechar estao fora da janela projetada - nao da' para contar o que nao se ve.
+    const estouroFranquia = porCiclo ? estouroCiclo : estouroCorrida;
+    const ok = furoPiso == null && estouroFranquia == null && sequenciaAberta == null;
+
     return {
-      ok, furoPiso, estouroCorrida, sequenciaAberta, sequencias,
+      ok, furoPiso, sequenciaAberta, sequencias,
+      modoFranquia: porCiclo ? 'mensal' : 'corridos',
+      estouroCorrida, estouroCiclo, estouroFranquia,
+      ciclos: Array.from(ciclos.values()).filter((c) => c.dias > 0),
       piorCorrida, piorCorridaInicio, menorSaldo, menorSaldoDia
     };
   }
@@ -536,6 +609,7 @@
     NOMES_DIA_SEMANA,
     domingoDePascoa, feriadosDoAno, criarCalendario,
     dataDaRegraNoMes, expandirRegras, valorNoMes,
+    chaveCiclo, rotuloCiclo, MESES_CURTOS,
     projetar, avaliar,
     criarContexto, projetarComRetiradas, maximoRetiravel, planoDeAportes
   };

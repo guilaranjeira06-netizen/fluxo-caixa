@@ -298,9 +298,24 @@ details.dobra > summary:hover { color: var(--tinta); }
         <input type="text" id="cfg-limite" inputmode="decimal" placeholder="2.000,00">
         <span class="dica">quanto a conta deixa ficar no vermelho</span>
       </label>
-      <label class="campo">Dias corridos no vermelho
+      <label class="campo">Dias no vermelho sem juros
         <input type="number" id="cfg-dias" min="0" max="60" step="1">
-        <span class="dica">sem juros, contagem zera ao voltar ao positivo</span>
+        <span class="dica">a franquia que o banco d&aacute;</span>
+      </label>
+      <label class="campo">Como o banco conta
+        <select id="cfg-modo-franquia">
+          <option value="mensal">Somados no ciclo</option>
+          <option value="corridos">Corridos seguidos</option>
+        </select>
+        <span class="dica">&quot;10 dias esse m&ecirc;s&quot; = somados</span>
+      </label>
+      <label class="campo">Dias j&aacute; usados no ciclo
+        <input type="number" id="cfg-dias-usados" min="0" max="60" step="1">
+        <span class="dica">o &quot;total de dias em uso&quot; do app do banco</span>
+      </label>
+      <label class="campo">Dia da virada do ciclo
+        <input type="number" id="cfg-virada" min="1" max="28" step="1">
+        <span class="dica">quando o contador zera; 1 = m&ecirc;s calend&aacute;rio</span>
       </label>
       <label class="campo">Colch&atilde;o de seguran&ccedil;a
         <input type="text" id="cfg-colchao" inputmode="decimal" placeholder="0,00">
@@ -759,6 +774,35 @@ details.dobra > summary:hover { color: var(--tinta); }
     return { dias, diaInicio, diaFim };
   }
 
+  // ---------------------------------------------------------------- ciclos
+
+  const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+                        'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+  /**
+   * A que ciclo de cobranca um dia pertence.
+   *
+   * O banco zera a franquia de dias no vencimento, nao no dia 1. Com
+   * `diaVirada` = 1 o ciclo e' o mes calendario; com 15, o ciclo vai do dia 15
+   * de um mes ao dia 14 do seguinte, e o dia 10 ainda conta para o mes anterior.
+   */
+  function chaveCiclo(dia, diaVirada) {
+    const dt = new Date(dia * MS_DIA);
+    let ano = dt.getUTCFullYear();
+    let mes = dt.getUTCMonth() + 1;
+    if (dt.getUTCDate() < (diaVirada || 1)) {
+      mes -= 1;
+      if (mes === 0) { mes = 12; ano -= 1; }
+    }
+    return ano + '-' + doisDigitos(mes);
+  }
+
+  /** '2026-09' -> 'set/2026'. */
+  function rotuloCiclo(chave) {
+    const [ano, mes] = chave.split('-').map(Number);
+    return MESES_CURTOS[mes - 1] + '/' + ano;
+  }
+
   // ------------------------------------------------------------ restricoes
 
   /**
@@ -775,6 +819,8 @@ details.dobra > summary:hover { color: var(--tinta); }
   function avaliar(projecao, restricoes) {
     const piso = restricoes.pisoCentavos;
     const maxDias = restricoes.maxDiasNegativos;
+    const porCiclo = restricoes.modoFranquia !== 'corridos';
+    const diaVirada = restricoes.diaViradaCiclo || 1;
     const dias = projecao.dias;
 
     let furoPiso = null;
@@ -787,6 +833,29 @@ details.dobra > summary:hover { color: var(--tinta); }
     let menorSaldoDia = null;
     const sequencias = [];
 
+    // Franquia mensal: o contador do banco soma os dias negativos do ciclo,
+    // estejam eles grudados ou nao. Tres dias agora e quatro daqui a duas
+    // semanas sao sete dias gastos, nao duas sequencias independentes.
+    const ciclos = new Map();
+    const chaveDoPrimeiro = dias.length ? chaveCiclo(dias[0].dia, diaVirada) : null;
+    let estouroCiclo = null;
+
+    function ciclo(chave) {
+      if (!ciclos.has(chave)) {
+        // O ciclo corrente ja' pode ter dias gastos antes de hoje - o
+        // "Total de dias em uso" que o banco mostra.
+        const jaUsados = chave === chaveDoPrimeiro
+          ? Math.max(0, Number(restricoes.diasJaUsadosNoCiclo) || 0)
+          : 0;
+        ciclos.set(chave, {
+          chave, rotulo: rotuloCiclo(chave), jaUsados,
+          dias: jaUsados, limite: maxDias, estourou: false, primeiroDia: null, ultimoDia: null
+        });
+      }
+      return ciclos.get(chave);
+    }
+    if (chaveDoPrimeiro) ciclo(chaveDoPrimeiro);
+
     for (let i = 0; i < dias.length; i++) {
       const d = dias[i];
       if (d.saldo < menorSaldo) { menorSaldo = d.saldo; menorSaldoDia = d; }
@@ -797,6 +866,17 @@ details.dobra > summary:hover { color: var(--tinta); }
         corrida++;
         if (corrida > piorCorrida) { piorCorrida = corrida; piorCorridaInicio = inicioCorrida; }
         if (estouroCorrida == null && corrida > maxDias) estouroCorrida = d;
+
+        const c = ciclo(chaveCiclo(d.dia, diaVirada));
+        c.dias++;
+        if (c.primeiroDia == null) c.primeiroDia = d;
+        c.ultimoDia = d;
+        d.diaDoCiclo = c.dias;
+        d.ciclo = c;
+        if (c.dias > maxDias) {
+          c.estourou = true;
+          if (estouroCiclo == null) estouroCiclo = { ciclo: c, dia: d };
+        }
       } else if (corrida > 0) {
         sequencias.push({ inicio: inicioCorrida, fim: dias[i - 1], dias: corrida, aberta: false });
         corrida = 0;
@@ -809,9 +889,17 @@ details.dobra > summary:hover { color: var(--tinta); }
       sequencias.push(sequenciaAberta);
     }
 
-    const ok = furoPiso == null && estouroCorrida == null && sequenciaAberta == null;
+    // A regra da franquia depende do modo; o piso e a sequencia aberta valem
+    // nos dois. Sequencia aberta e' violacao porque os dias que faltam para ela
+    // fechar estao fora da janela projetada - nao da' para contar o que nao se ve.
+    const estouroFranquia = porCiclo ? estouroCiclo : estouroCorrida;
+    const ok = furoPiso == null && estouroFranquia == null && sequenciaAberta == null;
+
     return {
-      ok, furoPiso, estouroCorrida, sequenciaAberta, sequencias,
+      ok, furoPiso, sequenciaAberta, sequencias,
+      modoFranquia: porCiclo ? 'mensal' : 'corridos',
+      estouroCorrida, estouroCiclo, estouroFranquia,
+      ciclos: Array.from(ciclos.values()).filter((c) => c.dias > 0),
       piorCorrida, piorCorridaInicio, menorSaldo, menorSaldoDia
     };
   }
@@ -930,6 +1018,7 @@ details.dobra > summary:hover { color: var(--tinta); }
     NOMES_DIA_SEMANA,
     domingoDePascoa, feriadosDoAno, criarCalendario,
     dataDaRegraNoMes, expandirRegras, valorNoMes,
+    chaveCiclo, rotuloCiclo, MESES_CURTOS,
     projetar, avaliar,
     criarContexto, projetarComRetiradas, maximoRetiravel, planoDeAportes
   };
@@ -1005,6 +1094,9 @@ details.dobra > summary:hover { color: var(--tinta); }
       dataReferencia: hojeISO(),
       limiteNegativo: 2000,
       maxDiasNegativos: 10,
+      modoFranquia: 'mensal',
+      diasJaUsadosNoCiclo: 0,
+      diaViradaCiclo: 1,
       colchao: 300,
       aporteMinimo: 100,
       conservador: false,
@@ -1091,7 +1183,11 @@ details.dobra > summary:hover { color: var(--tinta); }
     var pisoBruto = conservador ? 0 : -Math.abs(E.paraCentavos(estado.limiteNegativo));
     var restricoes = {
       pisoCentavos: pisoBruto + colchao,
-      maxDiasNegativos: conservador ? 0 : (Number(estado.maxDiasNegativos) || 0)
+      maxDiasNegativos: conservador ? 0 : (Number(estado.maxDiasNegativos) || 0),
+      // Sem valor salvo, vale a regra do banco dele: "10 dias esse mes", somados.
+      modoFranquia: estado.modoFranquia === 'corridos' ? 'corridos' : 'mensal',
+      diaViradaCiclo: Number(estado.diaViradaCiclo) || 1,
+      diasJaUsadosNoCiclo: conservador ? 0 : (Number(estado.diasJaUsadosNoCiclo) || 0)
     };
 
     var ctx = E.criarContexto({
@@ -1157,15 +1253,9 @@ details.dobra > summary:hover { color: var(--tinta); }
         (r.colchao > 0 ? ' O colchão de ' + E.formatarBRL(r.colchao) + ' já está preservado.' : '') +
         '<br><br>' + explicarTrava(r);
 
-      var seqs = (r.avaliacaoPlano.sequencias || []).filter(function (s) { return s.dias > 0; });
-      if (seqs.length) {
-        var pior = seqs.reduce(function (a, b) { return b.dias > a.dias ? b : a; });
-        avisos.appendChild(montarAviso('atencao', '&#9679;',
-          '<b>Esse plano usa o vermelho.</b> O saldo fica negativo por ' + pior.dias +
-          ' dia' + (pior.dias > 1 ? 's' : '') + ' corrido' + (pior.dias > 1 ? 's' : '') +
-          ', de ' + dataLonga(pior.inicio.iso) + ' a ' + dataLonga(pior.fim.iso) +
-          ' &mdash; dentro dos ' + r.restricoes.maxDiasNegativos + ' dias que a conta permite, ' +
-          'e o pior saldo é ' + E.formatarBRL(r.avaliacaoPlano.menorSaldo) + '.'));
+      var usoDoVermelho = resumoDoVermelho(r);
+      if (usoDoVermelho) {
+        avisos.appendChild(montarAviso('atencao', '&#9679;', usoDoVermelho));
       } else if (r.sugeridoHoje > 0) {
         avisos.appendChild(montarAviso('bom', '&#10003;',
           'Com esse aporte a conta não fica negativa nenhum dia dentro do horizonte.'));
@@ -1210,32 +1300,84 @@ details.dobra > summary:hover { color: var(--tinta); }
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
   function explicarTrava(r) {
     var t = r.trava || {};
-    if (t.centavos === 0) return 'Não sobra nada hoje: o saldo já está comprometido com o que vem.';
-    if (t.trava === 'saldo') {
+    // Quando o maximo e' zero o motivo importa MAIS, nao menos: e' a diferenca
+    // entre "espere o salario" e "sua franquia do mes acabou". Muda so' o
+    // enquadramento da frase, nunca o diagnostico.
+    var zerado = t.centavos === 0;
+    var prefixo = zerado ? '<b>Não sobra nada hoje.</b> ' : '';
+    var maisQueIsso = zerado ? 'Tirar qualquer valor' : 'Tirar um real a mais';
+
+    if (!zerado && t.trava === 'saldo') {
       return '<b>O teto é o próprio saldo.</b> Você pode transferir tudo o que tem em conta: ' +
              'as saídas até o próximo recebimento cabem dentro do vermelho permitido.';
     }
-    if (t.trava === 'piso') {
+    if (!zerado && t.trava === 'piso') {
       return '<b>O teto é o piso do saldo</b> (' + E.formatarBRL(r.restricoes.pisoCentavos) +
              (r.colchao > 0 ? ', já com o colchão preservado' : '') + ').';
     }
+
     var a = t.avaliacaoNoLimite;
-    if (!a) return '';
+    if (!a) return prefixo + 'O saldo já está comprometido com o que vem pela frente.';
+
     if (a.furoPiso) {
-      return '<b>O que trava é ' + dataLonga(a.furoPiso.iso) + '.</b> Um real a mais e o saldo ' +
-             'daquele dia passaria de ' + E.formatarBRL(r.restricoes.pisoCentavos) +
+      return prefixo + maisQueIsso + ' e o saldo de ' + dataLonga(a.furoPiso.iso) +
+             ' passaria de ' + E.formatarBRL(r.restricoes.pisoCentavos) +
              (r.colchao > 0 ? ', o piso com o colchão preservado.' : ', o piso da conta.');
     }
+    if (a.estouroCiclo && a.modoFranquia === 'mensal') {
+      var c = a.estouroCiclo.ciclo;
+      return prefixo + '<b>O que trava é a franquia de ' + c.rotulo + '.</b> ' + maisQueIsso +
+             ' e você usaria ' + c.dias + ' dos ' + r.restricoes.maxDiasNegativos +
+             ' dias de vermelho do ciclo' +
+             (c.jaUsados ? ', porque ' + c.jaUsados + ' já foram gastos antes de hoje' : '') +
+             ' &mdash; a partir daí o banco cobra juros.';
+    }
     if (a.estouroCorrida) {
-      return '<b>O que trava é o prazo do vermelho.</b> Um real a mais e a conta ficaria negativa ' +
-             'por mais de ' + r.restricoes.maxDiasNegativos + ' dias corridos a partir de ' +
-             dataLonga(a.piorCorridaInicio.iso) + ' &mdash; aí começa a contar juros.';
+      return prefixo + '<b>O que trava é o prazo do vermelho.</b> ' + maisQueIsso +
+             ' e a conta ficaria negativa por mais de ' + r.restricoes.maxDiasNegativos +
+             ' dias corridos a partir de ' + dataLonga(a.piorCorridaInicio.iso) +
+             ' &mdash; aí começa a contar juros.';
     }
     if (a.sequenciaAberta) {
-      return '<b>O que trava é o fim da projeção.</b> Um real a mais e o saldo ficaria negativo ' +
-             'desde ' + dataLonga(a.sequenciaAberta.inicio.iso) + ' sem entrada que cubra dentro do horizonte.';
+      return prefixo + '<b>O que trava é o fim da projeção.</b> ' + maisQueIsso +
+             ' e o saldo ficaria negativo desde ' + dataLonga(a.sequenciaAberta.inicio.iso) +
+             ' sem entrada que cubra dentro do horizonte.';
     }
-    return '';
+    return prefixo;
+  }
+
+  /**
+   * Quanto da franquia o plano consome. No modo mensal a frase tem que falar
+   * em ciclos, nao em sequencias: o que o banco cobra e' o total de dias
+   * negativos do mes, grudados ou nao.
+   */
+  function resumoDoVermelho(r) {
+    var a = r.avaliacaoPlano;
+    var limite = r.restricoes.maxDiasNegativos;
+    var pior = E.formatarBRL(a.menorSaldo);
+
+    if (a.modoFranquia === 'mensal') {
+      // Dias que ESTE plano gasta, nao os que ja estavam gastos: um ciclo que
+      // so' carrega o contador do banco nao significa que o plano use o vermelho.
+      var ciclos = (a.ciclos || []).filter(function (c) { return c.dias > c.jaUsados; });
+      if (!ciclos.length) return '';
+      var partes = ciclos.map(function (c) {
+        var novos = c.dias - c.jaUsados;
+        return '<b>' + novos + ' dia' + (novos > 1 ? 's' : '') + '</b> em ' + c.rotulo +
+               ' (' + c.dias + ' de ' + limite + ' no ciclo' +
+               (c.jaUsados ? ', contando os ' + c.jaUsados + ' já usados' : '') + ')';
+      });
+      return '<b>Esse plano usa o vermelho.</b> Consome ' + partes.join(' e ') +
+             '. O pior saldo é ' + pior + '.';
+    }
+
+    var seqs = (a.sequencias || []).filter(function (s) { return s.dias > 0; });
+    if (!seqs.length) return '';
+    var maior = seqs.reduce(function (x, y) { return y.dias > x.dias ? y : x; });
+    return '<b>Esse plano usa o vermelho.</b> O saldo fica negativo por ' + maior.dias +
+           ' dia' + (maior.dias > 1 ? 's' : '') + ' corrido' + (maior.dias > 1 ? 's' : '') +
+           ', de ' + dataLonga(maior.inicio.iso) + ' a ' + dataLonga(maior.fim.iso) +
+           ' &mdash; dentro dos ' + limite + ' que a conta permite. O pior saldo é ' + pior + '.';
   }
 
   function fato(pai, chave, valor, sub) {
@@ -1264,6 +1406,12 @@ details.dobra > summary:hover { color: var(--tinta); }
         ' o saldo chega a ' + E.formatarBRL(a.furoPiso.saldo) + ', ' + E.formatarBRL(falta) +
         ' abaixo do limite de ' + E.formatarBRL(r.restricoes.pisoCentavos) +
         '. Não há o que investir: falta dinheiro.';
+    } else if (a.estouroCiclo && a.modoFranquia === 'mensal') {
+      var ciclo = a.estouroCiclo.ciclo;
+      texto = '<b>A franquia de ' + ciclo.rotulo + ' não dá conta.</b> Mesmo sem tirar nada, ' +
+        'o saldo fica negativo ' + ciclo.dias + ' dias nesse ciclo, acima dos ' +
+        r.restricoes.maxDiasNegativos + ' sem juros' +
+        (ciclo.jaUsados ? ' (' + ciclo.jaUsados + ' já usados antes de hoje)' : '') + '.';
     } else if (a.estouroCorrida) {
       texto = '<b>O vermelho passa do prazo.</b> A partir de ' + dataLonga(a.piorCorridaInicio.iso) +
         ' o saldo fica negativo por ' + a.piorCorrida + ' dias corridos, acima dos ' +
@@ -1348,13 +1496,19 @@ details.dobra > summary:hover { color: var(--tinta); }
     });
   }
 
-  /** "3o de 10" - em que ponto da franquia esse dia negativo esta'. */
+  /** "3º de 10 · set" - em que ponto da franquia esse dia negativo esta'. */
   function diaDaSequencia(r, dia) {
+    var limite = r.restricoes.maxDiasNegativos;
+    // No modo mensal, avaliar() carimba o contador do ciclo em cada dia.
+    if (r.avaliacaoPlano.modoFranquia === 'mensal') {
+      if (!dia.ciclo) return '';
+      return dia.diaDoCiclo + 'º de ' + limite + ' · ' + dia.ciclo.rotulo.split('/')[0];
+    }
     var seq = (r.avaliacaoPlano.sequencias || []).find(function (s) {
       return dia.dia >= s.inicio.dia && dia.dia <= s.fim.dia;
     });
     if (!seq) return '';
-    return (dia.dia - seq.inicio.dia + 1) + 'º de ' + r.restricoes.maxDiasNegativos;
+    return (dia.dia - seq.inicio.dia + 1) + 'º de ' + limite;
   }
 
   // -------------------------------------------------------- render: grafico
@@ -1750,6 +1904,9 @@ details.dobra > summary:hover { color: var(--tinta); }
     $('#cfg-data').value = estado.dataReferencia || hojeISO();
     $('#cfg-limite').value = paraCampo(E.paraCentavos(estado.limiteNegativo));
     $('#cfg-dias').value = estado.maxDiasNegativos;
+    $('#cfg-modo-franquia').value = estado.modoFranquia === 'corridos' ? 'corridos' : 'mensal';
+    $('#cfg-dias-usados').value = Number(estado.diasJaUsadosNoCiclo) || 0;
+    $('#cfg-virada').value = Number(estado.diaViradaCiclo) || 1;
     $('#cfg-colchao').value = paraCampo(E.paraCentavos(estado.colchao));
     $('#cfg-minimo').value = paraCampo(E.paraCentavos(estado.aporteMinimo));
     $('#cfg-horizonte').value = String(estado.horizonteMeses);
@@ -1780,6 +1937,15 @@ details.dobra > summary:hover { color: var(--tinta); }
     });
     $('#cfg-dias').addEventListener('change', function () {
       estado.maxDiasNegativos = Math.max(0, Number($('#cfg-dias').value) || 0); aplicar();
+    });
+    $('#cfg-modo-franquia').addEventListener('change', function () {
+      estado.modoFranquia = $('#cfg-modo-franquia').value; aplicar();
+    });
+    $('#cfg-dias-usados').addEventListener('change', function () {
+      estado.diasJaUsadosNoCiclo = Math.max(0, Number($('#cfg-dias-usados').value) || 0); aplicar();
+    });
+    $('#cfg-virada').addEventListener('change', function () {
+      estado.diaViradaCiclo = Math.min(28, Math.max(1, Number($('#cfg-virada').value) || 1)); aplicar();
     });
     $('#cfg-horizonte').addEventListener('change', function () {
       estado.horizonteMeses = Number($('#cfg-horizonte').value); aplicar();

@@ -5,13 +5,17 @@ const E = require('../src/engine.js');
 
 const cal = E.criarCalendario({});
 
-function ctxDe({ saldo, inicio, fim, lancamentos, piso = -200000, maxDias = 10 }) {
+function ctxDe({ saldo, inicio, fim, lancamentos, piso = -200000, maxDias = 10,
+                modo = 'mensal', virada = 1, jaUsados = 0 }) {
   return E.criarContexto({
     saldoInicialCentavos: E.paraCentavos(saldo),
     diaInicio: E.isoParaDia(inicio),
     diaFim: E.isoParaDia(fim),
     lancamentos,
-    restricoes: { pisoCentavos: piso, maxDiasNegativos: maxDias }
+    restricoes: {
+      pisoCentavos: piso, maxDiasNegativos: maxDias,
+      modoFranquia: modo, diaViradaCiclo: virada, diasJaUsadosNoCiclo: jaUsados
+    }
   });
 }
 
@@ -144,10 +148,17 @@ test('avaliar conta dias corridos negativos e nao os soma entre sequencias', () 
     diaInicio: E.isoParaDia('2026-09-01'), diaFim: E.isoParaDia('2026-09-08'),
     lancamentos: [lanc('2026-09-04', 20), lanc('2026-09-05', -20), lanc('2026-09-08', 20)]
   });
-  const a = E.avaliar(p, { pisoCentavos: -1000000, maxDiasNegativos: 4 });
+  const a = E.avaliar(p, { pisoCentavos: -1000000, maxDiasNegativos: 4, modoFranquia: 'corridos' });
   assert.strictEqual(a.piorCorrida, 3);
   assert.strictEqual(a.estouroCorrida, null);
   assert.strictEqual(a.ok, true);
+
+  // No modo mensal os mesmos dias somam: 3 + 3 = 6 no mesmo ciclo, acima de 4.
+  const b = E.avaliar(p, { pisoCentavos: -1000000, maxDiasNegativos: 4, modoFranquia: 'mensal' });
+  assert.strictEqual(b.ciclos.length, 1);
+  assert.strictEqual(b.ciclos[0].dias, 6);
+  assert.ok(b.estouroCiclo);
+  assert.strictEqual(b.ok, false);
 });
 
 test('sequencia negativa maior que o limite reprova', () => {
@@ -324,4 +335,79 @@ test('o motivo da trava distingue saldo de fluxo futuro', () => {
   assert.strictEqual(r.centavos, 100000); // 10000 - 9000
   assert.ok(r.avaliacaoNoLimite.furoPiso, 'deve apontar o dia que quebraria');
   assert.strictEqual(r.avaliacaoNoLimite.furoPiso.iso, '2026-09-10');
+});
+
+
+// ------------------------------------------------- franquia mensal (somada)
+
+test('a franquia mensal soma dias separados; a corrida nao', () => {
+  // 2 dias negativos, 10 dias positivos, mais 2 dias negativos - tudo em setembro.
+  const p = E.projetar({
+    saldoInicialCentavos: E.paraCentavos(-10),
+    diaInicio: E.isoParaDia('2026-09-01'), diaFim: E.isoParaDia('2026-09-20'),
+    lancamentos: [lanc('2026-09-03', 20), lanc('2026-09-15', -20), lanc('2026-09-17', 20)]
+  });
+  const base = { pisoCentavos: -1000000, maxDiasNegativos: 3 };
+  const corridos = E.avaliar(p, Object.assign({ modoFranquia: 'corridos' }, base));
+  const mensal = E.avaliar(p, Object.assign({ modoFranquia: 'mensal' }, base));
+  assert.strictEqual(corridos.piorCorrida, 2);
+  assert.strictEqual(corridos.ok, true, 'nenhuma sequencia passa de 3');
+  assert.strictEqual(mensal.ciclos[0].dias, 4);
+  assert.strictEqual(mensal.ok, false, '4 dias somados no mes passam de 3');
+});
+
+test('a franquia mensal zera na virada do mes', () => {
+  // 5 dias no fim de setembro e 5 no inicio de outubro: 10 corridos, mas 5 por ciclo.
+  const p = E.projetar({
+    saldoInicialCentavos: 0,
+    diaInicio: E.isoParaDia('2026-09-20'), diaFim: E.isoParaDia('2026-10-20'),
+    lancamentos: [lanc('2026-09-26', -100), lanc('2026-10-06', 100)]
+  });
+  const a = E.avaliar(p, { pisoCentavos: -1000000, maxDiasNegativos: 6, modoFranquia: 'mensal' });
+  assert.deepStrictEqual(a.ciclos.map((c) => [c.chave, c.dias]), [['2026-09', 5], ['2026-10', 5]]);
+  assert.strictEqual(a.ok, true);
+  // Como corrida seriam 10 dias grudados, acima de 6.
+  const b = E.avaliar(p, { pisoCentavos: -1000000, maxDiasNegativos: 6, modoFranquia: 'corridos' });
+  assert.strictEqual(b.piorCorrida, 10);
+  assert.strictEqual(b.ok, false);
+});
+
+test('a virada do ciclo desloca a fronteira dos meses', () => {
+  // Virada no dia 15: 10/10 e 20/10 caem em ciclos diferentes.
+  const dez = E.isoParaDia('2026-10-10');
+  const vinte = E.isoParaDia('2026-10-20');
+  assert.strictEqual(E.chaveCiclo(dez, 1), '2026-10');
+  assert.strictEqual(E.chaveCiclo(vinte, 1), '2026-10');
+  assert.strictEqual(E.chaveCiclo(dez, 15), '2026-09');
+  assert.strictEqual(E.chaveCiclo(vinte, 15), '2026-10');
+  assert.strictEqual(E.rotuloCiclo('2026-09'), 'set/2026');
+});
+
+test('dias ja usados no ciclo entram na conta e reduzem o aporte', () => {
+  // Sai 1000 no dia 10, entra 1000 no dia 14: 4 dias negativos se investir tudo.
+  const base = {
+    saldo: 1000, inicio: '2026-09-05', fim: '2026-12-31',
+    lancamentos: [lanc('2026-09-10', -1000), lanc('2026-09-14', 1000)],
+    piso: -330000, maxDias: 5, modo: 'mensal'
+  };
+  const dia = E.isoParaDia('2026-09-05');
+  const zerado = E.maximoRetiravel(ctxDe(base), dia, []);
+  const gasto = E.maximoRetiravel(ctxDe(Object.assign({}, base, { jaUsados: 4 })), dia, []);
+  assert.strictEqual(zerado.centavos, 100000, 'com a franquia inteira, investe tudo');
+  assert.strictEqual(gasto.centavos, 0, 'com 4 de 5 dias gastos, os 4 dias nao cabem');
+});
+
+test('o cenario do usuario: conta de 1000 hoje, entram 2000 em cinco dias', () => {
+  const ctx = ctxDe({
+    saldo: 1000, inicio: '2026-09-07', fim: '2026-12-31',
+    lancamentos: [lanc('2026-09-08', -1000, 'Boleto'), lanc('2026-09-12', 2000, 'Salario')],
+    piso: -330000, maxDias: 10, modo: 'mensal'
+  });
+  const r = E.maximoRetiravel(ctx, E.isoParaDia('2026-09-07'), []);
+  assert.strictEqual(r.centavos, 100000, 'da para investir os 1000 e ficar negativo');
+  const proj = E.projetarComRetiradas(ctx, [{ dia: E.isoParaDia('2026-09-07'), centavos: 100000 }]);
+  const a = E.avaliar(proj, ctx.restricoes);
+  assert.strictEqual(a.ok, true);
+  assert.strictEqual(a.menorSaldo, -100000, 'fica 1000 negativo, como ele descreveu');
+  assert.strictEqual(a.ciclos[0].dias, 4, 'consome 4 dos 10 dias de setembro');
 });

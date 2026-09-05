@@ -61,14 +61,30 @@ Duas, e são elas que fazem a ferramenta valer:
   Limite de R$ 2.000 com colchão de R$ 300 dá um piso de −R$ 1.700. No modo
   conservador o limite é zero, e o mesmo colchão vira um piso de +R$ 300. É uma
   regra só, então destaque, plano, gráfico e extrato falam sempre do mesmo número.
-- **Prazo do vermelho.** No máximo N dias **corridos seguidos** com saldo
-  negativo (10, por padrão). A contagem zera toda vez que o saldo volta ao
-  positivo: cinco dias negativo, um dia positivo e mais cinco negativo são duas
-  sequências de cinco, não uma de dez.
+- **Franquia de dias no vermelho.** No máximo N dias negativos por ciclo de
+  cobrança (10, por padrão), contados como o banco conta. Dois modos:
+
+  - **Somados no ciclo** (padrão) — todo dia negativo gasta 1 da franquia do
+    mês, estejam os dias grudados ou não. É o modelo de quem mostra na tela
+    "você tem 10 dias para usar seu limite sem juros esse mês" com um contador
+    de "total de dias em uso". Três dias agora e quatro daqui a duas semanas
+    são **sete dias gastos**.
+  - **Corridos seguidos** — a contagem zera toda vez que o saldo volta ao
+    positivo. Nesse modelo os mesmos dias seriam duas sequências independentes,
+    de três e de quatro.
+
+  A diferença muda a resposta, então confira no app do seu banco antes de
+  confiar no número. No modo somado dá para informar o **dia da virada do
+  ciclo** (1 = mês calendário) e quantos **dias você já gastou** neste ciclo —
+  se já foram 8 dos 10, o cálculo de hoje respeita os 2 que sobraram.
 
 É essa segunda restrição que libera dinheiro. Sem ela você precisaria deixar em
 conta tudo o que vai sair antes do próximo recebimento. Com ela, um mergulho no
 vermelho que fecha em três dias é aceitável — e o que estava travado vira aporte.
+
+Exemplo: conta de R$ 1.000 vence amanhã, entram R$ 2.000 daqui a cinco dias, e
+você tem R$ 1.000 em caixa. Dá para investir os R$ 1.000 inteiros e ficar
+R$ 1.000 negativo por quatro dias, gastando 4 da franquia de 10 do mês.
 
 ### 4. O solver
 
@@ -98,7 +114,7 @@ dia, quanto falta e qual restrição quebrou.
 ## Uso
 
 ```
-node --test test/     # 31 testes do motor de cálculo
+node --test test/     # 36 testes do motor de cálculo
 node build.js         # gera dist/fluxo-caixa.html, arquivo único
 ```
 
