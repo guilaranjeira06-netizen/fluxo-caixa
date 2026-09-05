@@ -181,7 +181,13 @@
     var dtFim = new Date(diaInicio * E.MS_DIA);
     dtFim.setUTCMonth(dtFim.getUTCMonth() + meses);
     var diaFimExibicao = Math.floor(dtFim.getTime() / E.MS_DIA);
-    var diaFimCalculo = diaFimExibicao + 60;
+    // A janela de CALCULO tem piso proprio, independente da de EXIBICAO.
+    //
+    // Horizonte e' escolha de quanto se quer VER. Se a verificacao encolhesse
+    // junto, olhar so' um mes liberaria dinheiro que estoura no mes seguinte -
+    // a vista mudaria a resposta, o que seria uma armadilha silenciosa. O piso
+    // de 150 dias mantem a mesma seguranca do padrao de tres meses.
+    var diaFimCalculo = Math.max(diaFimExibicao + 60, diaInicio + 150);
 
     var lancamentos = E.expandirRegras(estado.regras, diaInicio, diaFimCalculo, calendario);
 
@@ -458,6 +464,14 @@
   }
 
   /** Qual restricao esta' segurando o valor de hoje - a pergunta que vem depois do numero. */
+  /**
+   * Marca a data que trava o valor quando ela cai depois do horizonte exibido.
+   * Sem isso, o app aponta um dia que nao aparece em tabela nenhuma da tela.
+   */
+  function foraDaVista(r, dia) {
+    return dia > r.diaFimExibicao ? ' (fora do horizonte mostrado)' : '';
+  }
+
   function explicarTrava(r) {
     var t = r.trava || {};
     // Quando o maximo e' zero o motivo importa MAIS, nao menos: e' a diferenca
@@ -479,7 +493,8 @@
     if (!a) return prefixo + 'O saldo já está comprometido com o que vem pela frente.';
 
     if (a.furoPiso) {
-      return prefixo + '<b>Trava em ' + dataLonga(a.furoPiso.iso) + '</b>: ' +
+      return prefixo + '<b>Trava em ' + dataLonga(a.furoPiso.iso) +
+             foraDaVista(r, E.isoParaDia(a.furoPiso.iso)) + '</b>: ' +
              maisQueIsso.toLowerCase() + ' e o saldo passaria de ' +
              E.formatarBRL(r.restricoes.pisoCentavos) + ', o piso da conta.';
     }
