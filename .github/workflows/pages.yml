@@ -48,20 +48,18 @@ jobs:
       - name: Montar o site
         run: node build.js
 
-      # Tenta ligar o Pages sozinho. Em repositorio publico o token do Actions
-      # costuma conseguir criar o site; em repositorio privado de plano
-      # gratuito, nao - o Pages nem existe la. Por isso a falha e' tratada logo
-      # abaixo em vez de derrubar o job com um erro que nao explica nada.
+      # Sem enablement: testado nos dois estados do repositorio, o GITHUB_TOKEN
+      # nao cria o site do Pages ("Resource not accessible by integration").
+      # Ele publica no Pages, mas ligar o Pages e' ato de um humano com acesso
+      # de admin. Tentar so' produzia um erro assustador antes do erro util.
       - id: pages
         uses: actions/configure-pages@v5
         continue-on-error: true
-        with:
-          enablement: true
 
-      - name: Explicar se o Pages nao pode ser ligado
+      - name: Explicar que o Pages precisa ser ligado a mao
         if: steps.pages.outcome == 'failure'
         run: |
-          echo "::error title=Ligue o Pages a mao::O workflow nao conseguiu ligar o GitHub Pages. Va em Settings > Pages > Build and deployment > Source: \"GitHub Actions\" e rode este workflow de novo. Em repositorio privado de plano gratuito o Pages nao existe: torne o repositorio publico ou publique a pasta site/ em outro servico estatico."
+          echo "::error title=Ligue o GitHub Pages uma vez::Abra Settings > Pages > Build and deployment e escolha Source: \"GitHub Actions\". E' uma vez so'; depois disso todo push publica sozinho. (Repositorio privado em plano gratuito nao tem Pages - nesse caso, publique a pasta site/ em outro servico estatico.)"
           exit 1
 
       - uses: actions/upload-pages-artifact@v3
