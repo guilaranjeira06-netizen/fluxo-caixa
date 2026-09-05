@@ -1195,7 +1195,10 @@
 
   function inputTexto(valor, aoMudar) {
     var i = criar('input', { type: 'text', value: valor == null ? '' : valor });
-    i.addEventListener('change', function () { aoMudar(i.value); aplicar(); });
+    i.addEventListener('change', function () {
+      aoMudar(i.value);
+      aplicar({ regras: false });
+    });
     return i;
   }
   function inputDinheiro(valorReais, aoMudar) {
@@ -1204,7 +1207,7 @@
       var c = E.paraCentavos(i.value);
       i.value = paraCampo(c);
       aoMudar(E.paraReais(c));
-      aplicar();
+      aplicar({ regras: false });
     });
     return i;
   }
@@ -1346,10 +1349,10 @@
     ao('#btn-nova-avulso', 'click', function () { novaRegra('entrada', 'unica'); });
     ao('#btn-nova-saida', 'click', function () { novaRegra('saida'); });
     ao('#btn-exemplo', 'click', function () {
-      if (confirm('Substituir os lançamentos atuais pela lista padrão?')) { estado = estadoExemplo(); aplicar(true); }
+      if (confirm('Substituir os lançamentos atuais pela lista padrão?')) { estado = estadoExemplo(); aplicar({ campos: true }); }
     });
     ao('#btn-zerar', 'click', function () {
-      if (confirm('Apagar todos os lançamentos e começar do zero?')) { estado = estadoVazio(); aplicar(true); }
+      if (confirm('Apagar todos os lançamentos e começar do zero?')) { estado = estadoVazio(); aplicar({ campos: true }); }
     });
     ao('#btn-registrar', 'click', function () { abrirRegistro(ultimoResultado); });
     ao('#reg-cancelar', 'click', fecharRegistro);
@@ -1383,7 +1386,7 @@
       valoresPorMes: {}
     });
     estado.exemplo = false;
-    aplicar(true);
+    aplicar({ campos: true });
   }
 
   // ------------------------------------------------- registrar transferencia
@@ -1439,7 +1442,7 @@
     }
     estado.exemplo = false;
     fecharRegistro();
-    aplicar(true);
+    aplicar({ campos: true });
   }
 
   // ------------------------------------------------------ backup e tema
@@ -1462,7 +1465,7 @@
         var novo = JSON.parse(leitor.result);
         if (!novo || !Array.isArray(novo.regras)) throw new Error('formato');
         estado = novo;
-        aplicar(true);
+        aplicar({ campos: true });
         $('#status-dados').textContent = 'Backup restaurado.';
       } catch (err) {
         $('#status-dados').textContent = 'Não consegui ler esse arquivo: ' + err.message;
@@ -1484,7 +1487,17 @@
 
   var ultimoResultado = null;
 
-  function aplicar(redesenharCampos) {
+  /**
+   * Recalcula e redesenha.
+   *
+   * `regras: false` mantem a lista de lancamentos como esta'. Redesenhar a
+   * lista a cada tecla confirmada arranca o foco do campo e, se o usuario
+   * digita rapido, chega a embaralhar o texto - a linha e' trocada por outra no
+   * meio da edicao. Estrutura (incluir, remover, mudar a agenda) redesenha;
+   * valor e descricao, nao.
+   */
+  function aplicar(opcoes) {
+    var o = opcoes === true ? { campos: true } : (opcoes || {});
     salvar();
     var r = calcular();
     ultimoResultado = r;
@@ -1493,8 +1506,8 @@
     renderPlano(r);
     renderGrafico(r);
     renderExtrato(r);
-    renderRegras(r);
-    if (redesenharCampos) preencherConfig();
+    if (o.regras !== false) renderRegras(r);
+    if (o.campos) preencherConfig();
   }
 
   function iniciar() {

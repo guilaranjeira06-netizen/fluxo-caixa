@@ -4,7 +4,7 @@
   "private": true,
   "description": "Calculadora de fluxo de caixa pessoal: quanto da para investir sem furar a conta",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test \"test/*.test.js\"",
     "build": "node build.js"
   }
 }

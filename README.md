@@ -182,7 +182,7 @@ dia, quanto falta e qual restrição quebrou.
 ## Uso
 
 ```
-node --test test/     # 42 testes do motor de cálculo
+npm test              # 42 testes do motor de cálculo
 node build.js         # gera dist/fluxo-caixa.html, arquivo único
 ```
 

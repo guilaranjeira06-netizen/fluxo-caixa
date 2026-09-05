@@ -1,13 +1,14 @@
 # Publica o app no GitHub Pages, para dar um endereco https - que e' o que o
 # iPhone exige para "Adicionar a Tela de Inicio" virar aplicativo de verdade.
 #
-# Antes do primeiro uso: Settings > Pages > Build and deployment > Source:
-# "GitHub Actions". Depois disso, todo push na branch padrao republica.
+# A primeira execucao tenta ligar o Pages sozinho. Se a organizacao nao
+# permitir, ligue a mao em Settings > Pages > Build and deployment > Source:
+# "GitHub Actions" e rode de novo. Depois disso, todo push na branch padrao
+# republica o site.
 name: Publicar no GitHub Pages
 
 on:
   push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -27,11 +28,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test test/
+      - run: node --test "test/*.test.js"
       - run: node build.js
 
   publicar:
     needs: testar
+    # Publica so' a partir da branch padrao, seja qual for o nome dela: este
+    # repositorio nao tem main, e fixar o nome deixaria o workflow mudo.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -47,6 +51,10 @@ jobs:
           mkdir -p site
           cp -r index.html manifest.webmanifest sw.js src icones dist site/
       - uses: actions/configure-pages@v5
+        # Liga o Pages sozinho na primeira execucao, para nao depender de
+        # ninguem lembrar de mexer em Settings.
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
